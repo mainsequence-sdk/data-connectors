@@ -1,0 +1,25 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[scripts]
+pip-install  = "pip install psycopg2-binary && pip install pgcopy --no-deps " #for timeseries orm
+
+[packages]
+python-dotenv = "*"
+pandas-market-calendars = "*"
+fire = "*"
+
+[requires]
+python_version = "3.9"
+
+[dev-packages]
+
+[prices-alpaca]
+alpaca-py = "*"
+
+[prices-binance]
+python-binance = "*"
+python-coinmarketcap = "*"
+pycoingecko = "*"
