@@ -1,4 +1,4 @@
-name: "Core Timeseries Data Processing"
+name: "Data Connector Jobs"
 jobs:
   - name: "Binance Prices Daily"
     resource:
