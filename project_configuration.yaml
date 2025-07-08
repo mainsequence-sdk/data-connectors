@@ -1,0 +1,49 @@
+name: "Core Timeseries Data Processing"
+jobs:
+  - name: "Binance Prices Daily"
+    resource:
+      script:
+        path: "/notebooks/binance_daily.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Alpaca Prices Daily Test"
+    resource:
+      script:
+        path: "/notebooks/alpaca_daily_test.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Alpaca Prices Daily"
+    resource:
+      notebook:
+        path: "/notebooks/alpaca_daily.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Fundamentals"
+    resource:
+      notebook:
+        path: "/notebooks/fundamentals.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Coingecko Market Cap"
+    resource:
+      notebook:
+        path: "/notebooks/coingecko_market_cap.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Polygon Market Cap"
+    resource:
+      notebook:
+        path: "/notebooks/polygon_market_cap.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
