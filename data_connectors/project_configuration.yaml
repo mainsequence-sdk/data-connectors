@@ -2,7 +2,7 @@ name: "Data Connector Jobs"
 jobs:
   - name: "Binance Prices Daily"
     resource:
-      script:
+      notebook:
         path: "/notebooks/binance_daily.ipynb"
     schedule:
       type: "crontab"
@@ -10,7 +10,7 @@ jobs:
 
   - name: "Alpaca Prices Daily Test"
     resource:
-      script:
+      notebook:
         path: "/notebooks/alpaca_daily_test.ipynb"
     schedule:
       type: "crontab"
