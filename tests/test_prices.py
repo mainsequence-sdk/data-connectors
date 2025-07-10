@@ -54,6 +54,18 @@ def test_alpaca_bars():
     ts = AlpacaEquityBars(asset_list=None, frequency_id="1d", adjustment="all")
     ts.run(debug_mode=True, force_update=True)
 
+def test_databento_bars_small():
+    from data_connectors.prices.databento.time_series import DatabentoHistoricalBars
+    from mainsequence.client import AssetCategory
+    asset_cat = AssetCategory.get(unique_identifier="magnificent_7")
+    assets = asset_cat.get_assets()[:2]
+    ts = DatabentoHistoricalBars(
+        asset_list=assets,
+        frequency_id="1d",
+        dataset="XNAS.ITCH"
+    )
+    ts.run(debug_mode=True, force_update=True)
+
 def test_alpaca_bars_small():
     from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
     from mainsequence.client import AssetCategory
@@ -94,8 +106,9 @@ def test_equity_fundamentals():
 # test_api_time_series()
 # test_binance_bars_from_trades()
 # test_binance_daily_bars()
-test_alpaca_bars()
+# test_alpaca_bars()
 # test_crypto_market_cap()
 # test_equity_market_cap()
 # test_alpaca_bars_small()
+test_databento_bars_small()
 # test_equity_fundamentals()

@@ -47,3 +47,11 @@ jobs:
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
+
+  - name: "Databento Prices Daily"
+    resource:
+     notebook:
+       path: "/notebooks/databento_prices.ipynb"
+    schedule:
+     type: "crontab"
+     expression: "0 0 * * *"
