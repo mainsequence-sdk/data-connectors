@@ -139,8 +139,6 @@ class PolygonBaseTimeSeries(TimeSerie):
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
 
-            self.local_persist_manager.open_for_everyone()
-
         # Let each subclass handle its own backend registration
         self._register_in_backend(update_statistics)
 
@@ -208,7 +206,6 @@ class PolygonDailyMarketCap(PolygonBaseTimeSeries):
         register_rules(
             translation_table_identifier,
             rules,
-            open_for_everyone=True,
         )
 
         # updater category from last_obsevation
@@ -237,7 +234,6 @@ class PolygonDailyMarketCap(PolygonBaseTimeSeries):
                         source="polygon",
                         description=f"This category contains the top {i} US Equities by market cap as of {last_date}",
                         unique_id=name.replace(" ", "_").lower(),
-                        open_for_everyone=True
                     )
                     print(f"Created Categories: US Equity: {asset_category}")
                 else:

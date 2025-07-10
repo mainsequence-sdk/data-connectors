@@ -89,7 +89,6 @@ def get_stock_assets():
             source="datahub.io",
             description="Constitutens of S&P500",
             unique_identifier=unique_identifier,
-            open_for_everyone=True
         )
     if mag_7_cat is None:
         mag_7_cat = AssetCategory.create(
@@ -97,7 +96,6 @@ def get_stock_assets():
             source="mainsequence",
             description="Constitutens of MAG7",
             unique_identifier=MAG_7_CATEGORY_NAME.lower().replace(" ", "_"),
-            open_for_everyone=True
         )
 
     mag_7_assets = Asset.filter(
@@ -141,7 +139,6 @@ def register_mts_in_backed(
         data_frequency_id,
         asset_list: List[Asset],
         description="",
-        open_for_everyone=True,
 ):
     try:
         bar_source = MarketsTimeSeriesDetails.get(
@@ -159,7 +156,6 @@ def register_mts_in_backed(
                 source_table__id=time_serie.metadata.id,
                 data_frequency_id=data_frequency_id,
                 description=description,
-                open_for_everyone=open_for_everyone
             )
 
     if bar_source is None:
@@ -173,20 +169,14 @@ def register_mts_in_backed(
 def register_rules(
     translation_table_identifier,
     rules,
-    open_for_everyone=False,
 ):
     translation_table = AssetTranslationTable.get_or_none(unique_identifier=translation_table_identifier)
     rules_serialized = [r.model_dump() for r in rules]
-    if open_for_everyone:
-        for rule in rules_serialized:
-            rule["open_for_everyone"] = True
-            rule["asset_filter"]["open_for_everyone"] = True
 
     if translation_table is None:
         translation_table = AssetTranslationTable.create(
             unique_identifier=translation_table_identifier,
             rules=rules_serialized,
-            open_for_everyone=open_for_everyone
         )
     else:
-        translation_table.add_rules(rules, open_for_everyone=open_for_everyone)
+        translation_table.add_rules(rules)

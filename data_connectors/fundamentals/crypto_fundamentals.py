@@ -117,8 +117,6 @@ class CoinGeckoMarketCap(TimeSerie):
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
 
-            self.local_persist_manager.open_for_everyone()
-
         register_mts_in_backed( unique_identifier="coingecko_market_cap",
                 time_serie=self,
                 data_frequency_id=DataFrequency.one_d,
@@ -151,7 +149,6 @@ class CoinGeckoMarketCap(TimeSerie):
         register_rules(
             translation_table_identifier,
             rules,
-            open_for_everyone=True,
         )
 
         from mainsequence.client.models_vam import  AssetCategory
@@ -178,7 +175,6 @@ class CoinGeckoMarketCap(TimeSerie):
                         source="coingecko",
                         description=f"This category contains the top {i} cryptos by market cap as of {last_date}",
                         unique_id=name.replace(" ","_").lower(),
-                        open_for_everyone=True
                     )
                     print(f"Created Categories: Crypto: {crypto_category}")
                 else:

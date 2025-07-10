@@ -349,8 +349,6 @@ class AlpacaEquityBars(TimeSerie):
         if not self.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
 
-        self.local_persist_manager.open_for_everyone()
-
         if error_on_last_update:
             self.logger.warning("Do not register data source due to error during run")
             return
@@ -389,6 +387,5 @@ class AlpacaEquityBars(TimeSerie):
             register_rules(
                 translation_table_identifier,
                 rules,
-                open_for_everyone=True,
             )
 
