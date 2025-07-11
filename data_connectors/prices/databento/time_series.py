@@ -82,6 +82,10 @@ class DatabentoHistoricalBars(TimeSerie):
             if data.empty:
                 return None
 
+            # calcualte vwap
+            pvt = data[["open", "high", "close"]].mean(axis=1) * data["volume"]
+            data["vwap"] = pvt.cumsum() / data["volume"].cumsum()
+
             data.index.name = "time_index"
             data['unique_identifier'] = asset.unique_identifier
             data["calendar"] = self.asset_calendar_map[asset.unique_identifier]
@@ -202,7 +206,8 @@ class DatabentoHistoricalBars(TimeSerie):
             raise NotImplementedError(f"Frequency '{self.frequency_id}' not implemented for market close alignment.")
 
         bars_request_df = bars_request_df.swaplevel()
-        bars_request_df = bars_request_df.drop(columns=["open_time", "day_key", "rtype"])
+        bars_request_df = bars_request_df.drop(columns=["day_key", "rtype"])
+        bars_request_df["open_time"] = bars_request_df["open_time"].apply(lambda dt: dt.timestamp())
 
         # filter out duplicates for assets
         for unique_identifier, last_update in update_statistics.items():
