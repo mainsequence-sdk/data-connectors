@@ -20,7 +20,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import traceback
 from typing import Union
-from ...utils import NAME_US_EQUITY_MARKET_CAP_TOP100, get_stock_assets, register_mts_in_backed, register_rules
+from ...utils import NAME_US_EQUITY_MARKET_CAP_TOP100, get_stock_assets, register_mts_in_backed
 
 ALPACA_API_KEY = os.environ.get('ALPACA_API_KEY', None)
 ALPACA_SECRET_KEY = os.environ.get('ALPACA_SECRET_KEY', None)
@@ -360,32 +360,6 @@ class AlpacaEquityBars(TimeSerie):
                 time_serie=self,
                 description=f"Alpaca {self.frequency_id} Bars",
                 data_frequency_id=self.frequency_id,
-                asset_list=update_statistics.asset_list)
-
-            # add rule to asset translation table
-            translation_table_identifier = f"prices_translation_table_{self.frequency_id}"
-            from mainsequence.client import AssetTranslationTable, AssetTranslationRule, AssetFilter
-            rules = [
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type="Common Stock",
-                    ),
-                    markets_time_serie_unique_identifier=markets_time_series_identifier,
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                ),
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                        security_type="Common Stock",
-                    ),
-                    markets_time_serie_unique_identifier=markets_time_series_identifier,
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                ),
-            ]
-
-            register_rules(
-                translation_table_identifier,
-                rules,
+                asset_list=update_statistics.asset_list
             )
 

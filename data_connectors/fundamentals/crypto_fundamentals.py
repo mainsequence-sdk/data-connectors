@@ -10,7 +10,7 @@ from typing import List, Optional
 from tqdm import tqdm
 from .utils import approximate_market_cap_with_polygon,get_polygon_financials,get_latest_market_cap_coingecko
 import json
-from ..utils import NAME_CRYPTO_MARKET_CAP, register_mts_in_backed, register_rules
+from ..utils import NAME_CRYPTO_MARKET_CAP, register_mts_in_backed
 
 
 class CoinGeckoMarketCap(TimeSerie):
@@ -122,34 +122,6 @@ class CoinGeckoMarketCap(TimeSerie):
                 data_frequency_id=DataFrequency.one_d,
                 description="Daily Market Cap Data from coingecko",
                 asset_list=update_statistics.asset_list,)
-
-        # add rule to asset translation table
-        translation_table_identifier = "marketcap_translation_table"
-        from mainsequence.client import AssetTranslationRule, AssetFilter
-        rules = [
-            AssetTranslationRule(
-                asset_filter=AssetFilter(
-                    execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                    security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                ),
-                markets_time_serie_unique_identifier="coingecko_market_cap",
-                target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-            ),
-            # From binance crypto assign binance
-            AssetTranslationRule(
-                asset_filter=AssetFilter(
-                    execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                    security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                ),
-                markets_time_serie_unique_identifier="coingecko_market_cap",
-                target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-            ),
-        ]
-
-        register_rules(
-            translation_table_identifier,
-            rules,
-        )
 
         from mainsequence.client.models_vam import  AssetCategory
 
