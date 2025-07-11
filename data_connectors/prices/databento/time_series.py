@@ -202,7 +202,7 @@ class DatabentoHistoricalBars(TimeSerie):
             raise NotImplementedError(f"Frequency '{self.frequency_id}' not implemented for market close alignment.")
 
         bars_request_df = bars_request_df.swaplevel()
-        bars_request_df = bars_request_df.drop(columns=["open_time", "day_key"])
+        bars_request_df = bars_request_df.drop(columns=["open_time", "day_key", "rtype"])
 
         # filter out duplicates for assets
         for unique_identifier, last_update in update_statistics.items():

@@ -21,10 +21,7 @@ class TestTimeSerie(TimeSerie):
             start_date=latest_value,
             end_date=None,
             great_or_equal=False,
-                                       )
-
-        a=5
-
+        )
         return full_data
 
 
@@ -54,18 +51,6 @@ def test_alpaca_bars():
     ts = AlpacaEquityBars(asset_list=None, frequency_id="1d", adjustment="all")
     ts.run(debug_mode=True, force_update=True)
 
-def test_databento_bars_small():
-    from data_connectors.prices.databento.time_series import DatabentoHistoricalBars
-    from mainsequence.client import AssetCategory
-    asset_cat = AssetCategory.get(unique_identifier="magnificent_7")
-    assets = asset_cat.get_assets()[:2]
-    ts = DatabentoHistoricalBars(
-        asset_list=assets,
-        frequency_id="1d",
-        dataset="XNAS.ITCH"
-    )
-    ts.run(debug_mode=True, force_update=True)
-
 def test_alpaca_bars_small():
     from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
     from mainsequence.client import AssetCategory
@@ -73,6 +58,29 @@ def test_alpaca_bars_small():
     assets = asset_cat.get_assets()[:2]
     ts = AlpacaEquityBars(asset_list=assets, frequency_id="1d", adjustment="all")
     ts.run(debug_mode=True, force_update=True)
+
+def test_databento_bars():
+    from data_connectors.prices.databento.time_series import DatabentoHistoricalBars
+    ts = DatabentoHistoricalBars(
+        asset_list=None,
+        frequency_id="1d",
+        dataset="XNAS.ITCH"
+    )
+    ts.run(debug_mode=True, force_update=True)
+
+
+def test_databento_bars_small():
+    from data_connectors.prices.databento.time_series import DatabentoHistoricalBars
+    from mainsequence.client import AssetCategory
+    asset_cat = AssetCategory.get(unique_identifier="magnificent_7")
+    assets = asset_cat.get_assets()  # [:2]
+    ts = DatabentoHistoricalBars(
+        asset_list=assets,
+        frequency_id="1d",
+        dataset="XNAS.ITCH"
+    )
+    ts.run(debug_mode=True, force_update=True)
+
 
 def test_api_time_series():
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades
@@ -110,5 +118,6 @@ def test_equity_fundamentals():
 # test_crypto_market_cap()
 # test_equity_market_cap()
 # test_alpaca_bars_small()
-test_databento_bars_small()
+# test_databento_bars_small()
+test_databento_bars()
 # test_equity_fundamentals()
