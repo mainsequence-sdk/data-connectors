@@ -81,6 +81,22 @@ def test_databento_bars_small():
     )
     ts.run(debug_mode=True, force_update=True)
 
+def test_databento_market_cap_small():
+    from data_connectors.fundamentals.databento.market_cap import DatabentoMarketCap
+    from mainsequence.client import AssetCategory
+
+    asset_cat = AssetCategory.get(unique_identifier="magnificent_7")
+    assets = asset_cat.get_assets()
+
+    dataset = "XNAS.ITCH"
+    prices_ts_identifier = f"databento_xnas_itch_1d_bars"
+
+    ts = DatabentoMarketCap(
+        asset_list=assets,
+        prices_time_serie_unique_identifier=prices_ts_identifier,
+        dataset=dataset
+    )
+    ts.run(debug_mode=True, force_update=True)
 
 def test_api_time_series():
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades
@@ -119,5 +135,6 @@ def test_equity_fundamentals():
 # test_equity_market_cap()
 # test_alpaca_bars_small()
 # test_databento_bars_small()
-test_databento_bars()
+test_databento_market_cap_small()
+# test_databento_bars()
 # test_equity_fundamentals()
