@@ -311,7 +311,4 @@ class PolygonQFundamentals(PolygonBaseTimeSeries):
             description="Quarterly Fundamentals Data provided by Polygon",
             asset_list=update_statistics.asset_list )
 
-        if self.metadata.sourcetableconfiguration is not None:
-            self.metadata.sourcetableconfiguration.patch_column_metadata(column_metadata=self.column_meta_data)
-
 
