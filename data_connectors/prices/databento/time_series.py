@@ -230,7 +230,7 @@ class DatabentoHistoricalBars(TimeSerie):
             self.logger.warning("Do not register data source due to error during run")
             return
 
-        if hasattr(self, "metadata"):
+        if self.metadata is not None:
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
 

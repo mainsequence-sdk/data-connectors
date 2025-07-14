@@ -286,7 +286,7 @@ class BaseBinanceEndpoint:
         """
         Use post init routines to configure the time series
         """
-        if hasattr(self,"metadata"):
+        if self.metadata is not None:
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
 
