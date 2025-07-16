@@ -53,7 +53,6 @@ class AlpacaEquityBars(TimeSerie):
         "mo": TimeFrameUnit.Month,
     }
 
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_list: Union[ModelList,None], frequency_id: str,
                  adjustment: str, local_kwargs_to_ignore: List[str] = ["asset_list"], *args, **kwargs):
         """

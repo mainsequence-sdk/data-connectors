@@ -442,7 +442,6 @@ class BinanceHistoricalBars(BaseBinanceEndpoint, TimeSerie):
     BATCH_UPDATE_DAYS = 30 * 12 * 8
     LAST_AVAILABLE_DAYS = 1
 
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             asset_list: ModelList,
@@ -503,7 +502,6 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint, TimeSerie):
     """
     BATCH_UPDATE_DAYS = 365
     LAST_AVAILABLE_DAYS = 1
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             asset_list: ModelList,

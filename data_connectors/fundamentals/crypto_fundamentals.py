@@ -18,7 +18,6 @@ class CoinGeckoMarketCap(TimeSerie):
     Gets latest MarketCap data. If no Market Data is available, gets the data since 1.1.2017.
     """
 
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             asset_list: Optional[ModelList] = None,

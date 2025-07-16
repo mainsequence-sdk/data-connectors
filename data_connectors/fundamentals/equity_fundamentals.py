@@ -28,7 +28,6 @@ class PolygonBaseTimeSeries(TimeSerie):
       (if the default set of assets to filter is different in each child class)
     """
 
-    @TimeSerie._post_init_routines()
     def __init__(
         self,
         asset_list: Optional[ModelList] = None,

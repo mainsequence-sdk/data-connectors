@@ -32,7 +32,6 @@ class DatabentoHistoricalBars(TimeSerie):
     # Databento misses earlier data
     OFFSET_START = datetime.datetime(2019, 1, 1, tzinfo=pytz.utc)
 
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_list: Optional[ModelList], frequency_id: str,
                  dataset: str, local_kwargs_to_ignore: List[str] = ["asset_list"],
                  *args, **kwargs):
