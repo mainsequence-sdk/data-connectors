@@ -383,7 +383,7 @@ class AlpacaEquityBars(TimeSerie):
             return pd.DataFrame()
 
         # Step 2: Fetch the raw data for the assets concurrently.
-        bars_request_df = self._fetch_data_concurrently(stats.asset_list, stats, cals, last_val)
+        bars_request_df = self._fetch_data_concurrently(stats.asset_list, stats, cals)
         if bars_request_df.empty:
             self.logger.info("No new bars were returned from the API.")
             return pd.DataFrame()
