@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from mainsequence.tdag.time_series import TimeSerie, ModelList
+from mainsequence.tdag.time_series import TimeSerie
 from mainsequence.client import (DataUpdates, MARKETS_CONSTANTS,Asset)
 from datetime import datetime, timedelta
 import pytz
@@ -24,13 +24,13 @@ class PolygonBaseTimeSeries(TimeSerie):
       (what to do in post-update to register data source)
 
     Optionally:
-    - _get_default_asset_list(self) -> ModelList
+    - _get_default_asset_list(self) -> List
       (if the default set of assets to filter is different in each child class)
     """
 
     def __init__(
         self,
-        asset_list: Optional[ModelList] = None,
+        asset_list: Optional[List] = None,
         local_kwargs_to_ignore: List[str] = ["asset_universe"],
         *args,
         **kwargs
@@ -51,7 +51,7 @@ class PolygonBaseTimeSeries(TimeSerie):
                 ]
             ), f"Execution Venue in all assets should be {MARKETS_CONSTANTS.FIGI_COMPOSITE_EV}"
 
-    def _get_default_asset_list(self) -> ModelList:
+    def _get_default_asset_list(self) -> List:
         """
         If no asset_list is provided, this method should be overridden
         in child classes to return the default set of assets.

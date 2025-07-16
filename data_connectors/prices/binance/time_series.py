@@ -1,4 +1,4 @@
-from mainsequence.tdag.time_series import TimeSerie, ModelList
+from mainsequence.tdag.time_series import TimeSerie
 from .utils import  get_bars_by_date, set_ohlc,fetch_binance_bars_for_single_day
 from ..utils import transform_frequency_to_seconds
 
@@ -9,7 +9,7 @@ import numpy as npA
 import pandas as pd
 import datetime
 import pytz
-from typing import Union, List
+from typing import Union, List, Optional
 import requests
 import calendar
 import json
@@ -209,7 +209,7 @@ def _process_symbol_update(
 class BaseBinanceEndpoint:
     def __init__(
             self,
-            asset_list: Union[ModelList,None],
+            asset_list: Optional[List],
             frequency_id: str,
             local_kwargs_to_ignore: List[str] = ["asset_list"],
             *args,
@@ -217,7 +217,7 @@ class BaseBinanceEndpoint:
     ):
         """
         Args:
-            asset_list (ModelList): List of assets.
+            asset_list (List): List of assets.
             frequency_id (str): ID of frequency (e.g., '1min').
             back_fill_futures_with_spot (bool): If True, futures are back-filled with spot prices.
             spot_pair (Union[str, None], optional): The spot pair. Defaults to None.
@@ -444,7 +444,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint, TimeSerie):
 
     def __init__(
             self,
-            asset_list: ModelList,
+            asset_list: List,
             frequency_id: str,
             local_kwargs_to_ignore: List[str] = ["asset_list"],
             *args,
@@ -452,7 +452,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint, TimeSerie):
     ):
         """
         Args:
-            asset_list (ModelList): List of assets.
+            asset_list (List): List of assets.
             frequency_id (str): ID of frequency (e.g., '1min').
             back_fill_futures_with_spot (bool): If True, futures are back-filled with spot prices.
             spot_pair (Union[str, None], optional): The spot pair. Defaults to None.
@@ -504,14 +504,14 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint, TimeSerie):
     LAST_AVAILABLE_DAYS = 1
     def __init__(
             self,
-            asset_list: ModelList,
+            asset_list: List,
             local_kwargs_to_ignore: List[str] = ["asset_list"],
             *args,
             **kwargs
     ):
         """
         Args:
-            asset_list (ModelList): List of assets.
+            asset_list (List): List of assets.
             back_fill_futures_with_spot (bool): If True, futures are back-filled with spot prices.
             spot_pair (Union[str, None], optional): The spot pair. Defaults to None.
             *args: Additional arguments.

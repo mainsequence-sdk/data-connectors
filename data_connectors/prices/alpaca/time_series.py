@@ -1,4 +1,4 @@
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList
+from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
 from mainsequence.client import DataUpdates, AssetCurrencyPair, Asset, DataFrequency, MARKETS_CONSTANTS, AssetCategory
 from alpaca.data.requests import CryptoBarsRequest
 from alpaca.data.historical import CryptoHistoricalDataClient
@@ -9,7 +9,7 @@ from alpaca.data.requests import StockLatestQuoteRequest, StockBarsRequest
 from alpaca.data.enums import Adjustment
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 import numpy as np
-from typing import List
+from typing import List, Optional, Tuple, Dict
 import pandas_market_calendars as mcal
 import os
 import pytz
@@ -51,7 +51,7 @@ class AlpacaEquityBars(TimeSerie):
 
     Attributes:
         frequency_id (str): The data frequency (e.g., '1m', '15m', '1d').
-        asset_list (ModelList | None): A specific list of assets to track, or None to track all.
+        asset_list (List | None): A specific list of assets to track, or None to track all.
         timeframe (TimeFrame): A parsed representation of the frequency.
         adjustment (Adjustment): The type of price adjustment to apply (e.g., splits, dividends).
     """
@@ -63,7 +63,7 @@ class AlpacaEquityBars(TimeSerie):
         "mo": TimeFrameUnit.Month,
     }
 
-    def __init__(self, asset_list: Union[ModelList,None], frequency_id: str,
+    def __init__(self, asset_list: Optional[List], frequency_id: str,
                  adjustment: str, local_kwargs_to_ignore: List[str] = ["asset_list"], *args, **kwargs):
         """
 
@@ -383,7 +383,7 @@ class AlpacaEquityBars(TimeSerie):
             return pd.DataFrame()
 
         # Step 2: Fetch the raw data for the assets concurrently.
-        bars_request_df = self._fetch_data_concurrently(stats.asset_list, stats, cals, last_val)
+        bars_request_df = self._fetch_data_concurrently(stats.asset_list, stats, cals)
         if bars_request_df.empty:
             self.logger.info("No new bars were returned from the API.")
             return pd.DataFrame()

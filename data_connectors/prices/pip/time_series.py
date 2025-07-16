@@ -3,7 +3,7 @@
 import datetime
 
 from dateutil.tz import tzoffset
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList
+from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
 import os
 import pytz
 from typing import List
@@ -20,8 +20,7 @@ class PIPDailyBenchmarkFromFile(TimeSerie):
     """
     INIT_HISTORY = datetime.datetime(2018, 1, 1).replace(tzinfo=pytz.UTC)
 
-    @TimeSerie._post_init_routines()
-    def __init__(self, asset_list: ModelList,
+    def __init__(self, asset_list: List,
                   local_kwargs_to_ignore: List[str] = ["asset_list"], *args, **kwargs):
         """
 
@@ -36,6 +35,7 @@ class PIPDailyBenchmarkFromFile(TimeSerie):
         self.asset_list = asset_list
 
         super().__init__(*args, **kwargs)
+
     def run_after_post_init_routines(self):
         """
         Use post init routines to configure the time series

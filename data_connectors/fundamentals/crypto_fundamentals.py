@@ -2,7 +2,7 @@
 
 
 import pandas as pd
-from mainsequence.tdag.time_series import TimeSerie, ModelList
+from mainsequence.tdag.time_series import TimeSerie
 from mainsequence.client import (DataUpdates, MARKETS_CONSTANTS, Asset, AssetCurrencyPair)
 from datetime import datetime, timedelta
 import pytz
@@ -20,7 +20,7 @@ class CoinGeckoMarketCap(TimeSerie):
 
     def __init__(
             self,
-            asset_list: Optional[ModelList] = None,
+            asset_list: Optional[List] = None,
             local_kwargs_to_ignore: List[str] = ["asset_universe"],
             *args,
             **kwargs
