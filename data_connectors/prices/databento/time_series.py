@@ -9,7 +9,7 @@ import databento as db
 import pandas as pd
 import pytz
 from mainsequence.client import DataUpdates, Asset
-from mainsequence.tdag.time_series import TimeSerie, ModelList
+from mainsequence.tdag.time_series import TimeSerie, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
@@ -32,7 +32,7 @@ class DatabentoHistoricalBars(TimeSerie):
     # Databento misses earlier data
     OFFSET_START = datetime.datetime(2019, 1, 1, tzinfo=pytz.utc)
 
-    def __init__(self, asset_list: Optional[ModelList], frequency_id: str,
+    def __init__(self, asset_list: Optional[List], frequency_id: str,
                  dataset: str, local_kwargs_to_ignore: List[str] = ["asset_list"],
                  *args, **kwargs):
         super().__init__(*args, **kwargs)

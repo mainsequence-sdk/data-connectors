@@ -9,7 +9,7 @@ from mainsequence.client import (
     DataUpdates, Asset, MarketsTimeSeriesDetails, DataFrequency,
     AssetTranslationRule, AssetFilter, MARKETS_CONSTANTS
 )
-from mainsequence.tdag.time_series import TimeSerie, ModelList, APITimeSerie
+from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
 
 from ...utils import get_stock_assets, register_mts_in_backed, register_rules
 
@@ -23,9 +23,8 @@ class DatabentoMarketCap(TimeSerie):
     """
     OFFSET_START = datetime.datetime(2019, 1, 1, tzinfo=pytz.utc)
 
-    @TimeSerie._post_init_routines()
     def __init__(self,
-                 asset_list: Optional[ModelList],
+                 asset_list: Optional[List],
                  prices_time_serie_unique_identifier: str,
                  dataset: str,
                  local_kwargs_to_ignore: List[str] = ["asset_list"],
