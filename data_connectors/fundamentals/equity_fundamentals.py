@@ -9,7 +9,7 @@ from tqdm import tqdm
 from .utils import approximate_market_cap_with_polygon,get_polygon_financials
 import json
 import json
-from ..utils import NAME_ALPACA_MARKET_CAP, get_stock_assets, register_mts_in_backed, register_rules
+from ..utils import NAME_ALPACA_MARKET_CAP, get_stock_assets, register_mts_in_backed
 from mainsequence.client import MarketsTimeSeriesDetails, DataFrequency, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
 
 
@@ -135,7 +135,7 @@ class PolygonBaseTimeSeries(TimeSerie):
             self.logger.warning("Do not register data source due to error during run")
             return
 
-        if hasattr(self, "metadata"):
+        if self.metadata is not None:
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
 
@@ -180,32 +180,6 @@ class PolygonDailyMarketCap(PolygonBaseTimeSeries):
             data_frequency_id=DataFrequency.one_d,
             description="Daily Market Cap Data",
             asset_list=update_statistics.asset_list
-        )
-
-        # add rule to asset translation table
-        translation_table_identifier = "marketcap_translation_table"
-        rules = [
-            AssetTranslationRule(
-                asset_filter=AssetFilter(
-                    execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                    security_type="Common Stock",
-                ),
-                markets_time_serie_unique_identifier="polygon_historical_marketcap",
-                target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-            ),
-            AssetTranslationRule(
-                asset_filter=AssetFilter(
-                    execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                    security_type="Common Stock",
-                ),
-                markets_time_serie_unique_identifier="polygon_historical_marketcap",
-                target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-            ),
-        ]
-
-        register_rules(
-            translation_table_identifier,
-            rules,
         )
 
         # updater category from last_obsevation
@@ -336,8 +310,5 @@ class PolygonQFundamentals(PolygonBaseTimeSeries):
             data_frequency_id=DataFrequency.one_quarter,
             description="Quarterly Fundamentals Data provided by Polygon",
             asset_list=update_statistics.asset_list )
-
-        if self.metadata.sourcetableconfiguration is not None:
-            self.metadata.sourcetableconfiguration.patch_column_metadata(column_metadata=self.column_meta_data)
 
 

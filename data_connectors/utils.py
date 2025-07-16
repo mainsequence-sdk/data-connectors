@@ -146,7 +146,7 @@ def register_mts_in_backed(
         )
 
         if time_serie.use_vam_assets and bar_source.source_table.id != time_serie.metadata.id:
-            bar_source = bar_source.patch(source_table__id=time_serie.metadata.id)
+            bar_source = bar_source.patch(source_table=time_serie.metadata.id)
 
     except DoesNotExist:
         if time_serie.use_vam_assets:

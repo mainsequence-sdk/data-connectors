@@ -21,7 +21,7 @@ from mainsequence.client import (MARKETS_CONSTANTS,
 import copy
 import logging
 
-from ...utils import has_sufficient_memory, NAME_CRYPTO_MARKET_CAP_TOP100, register_mts_in_backed, register_rules, \
+from ...utils import has_sufficient_memory, NAME_CRYPTO_MARKET_CAP_TOP100, register_mts_in_backed, \
     NAME_CRYPTO_MARKET_CAP_TOP50, NAME_CRYPTO_MARKET_CAP_TOP10
 from .utils import fetch_futures_symbols_dict, fetch_spot_symbols_dict
 
@@ -286,7 +286,7 @@ class BaseBinanceEndpoint:
         """
         Use post init routines to configure the time series
         """
-        if hasattr(self,"metadata"):
+        if self.metadata is not None:
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
 
@@ -496,34 +496,6 @@ class BinanceHistoricalBars(BaseBinanceEndpoint, TimeSerie):
                 data_frequency_id=self.frequency_id,
 
             )
-
-            translation_table_identifier = f"prices_translation_table_{self.frequency_id}"
-            from mainsequence.client import AssetTranslationRule, AssetFilter
-            rules = [
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                    ),
-                    markets_time_serie_unique_identifier="binance_1d_bars",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                ),
-                # From binance crypto assign binance
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                    ),
-                    markets_time_serie_unique_identifier="binance_1d_bars",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                ),
-            ]
-
-            register_rules(
-                translation_table_identifier,
-                rules,
-            )
-
 
 class BinanceBarsFromTrades(BaseBinanceEndpoint, TimeSerie):
     """
