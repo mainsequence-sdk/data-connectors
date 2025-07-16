@@ -112,17 +112,19 @@ class ImportValmer(TimeSerie):
 
     def _run_post_update_routines(self, error_on_last_update, update_statistics: DataUpdates):
         MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "vector_de_precios_valmer"
+        source_table=self.local_time_serie.remote_table
+
         try:
             markets_time_series_details = MarketsTimeSeriesDetails.get(
                 unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
             )
-            if markets_time_series_details.related_local_time_serie.id != self.local_time_serie.id:
+            if markets_time_series_details.source_table.id != source_table.id:
                 markets_time_series_details = markets_time_series_details.patch(
-                    related_local_time_serie__id=self.local_time_serie.id)
+                    source_table__id=source_table.id)
         except DoesNotExist:
             markets_time_series_details = MarketsTimeSeriesDetails.update_or_create(
                 unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
-                related_local_time_serie__id=self.local_time_serie.id,
+                source_table__id=source_table.id,
                 data_frequency_id=DataFrequency.one_d,
                 description="This time series contains the valuation prices from the price provider VALMER",
             )
