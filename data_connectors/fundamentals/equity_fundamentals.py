@@ -51,25 +51,12 @@ class PolygonBaseTimeSeries(TimeSerie):
                 ]
             ), f"Execution Venue in all assets should be {MARKETS_CONSTANTS.FIGI_COMPOSITE_EV}"
 
-    def _get_default_asset_list(self) -> List:
+    def _get_asset_list(self) -> List:
         """
         If no asset_list is provided, this method should be overridden
         in child classes to return the default set of assets.
         """
         raise NotImplementedError("Subclass must implement its own default asset list.")
-
-    def set_update_statistics(self, update_statistics: "DataUpdates"):
-        """
-        Overwrites the main method to include custom assets in the update if none provided.
-        """
-        # If we didn't get an explicit list, ask the subclass for the default
-        if self.asset_list is None:
-            self.asset_list = self._get_default_asset_list()
-            self.logger.info(
-                f"{self.local_hash_id} is updating {len(self.asset_list)} assets"
-            )
-
-        return super().set_update_statistics(update_statistics=update_statistics)
 
     def _get_provider_data(self, from_date: datetime, symbol: str, to_date: datetime) -> pd.DataFrame:
         """
@@ -150,12 +137,12 @@ class PolygonDailyMarketCap(PolygonBaseTimeSeries):
     Uses 'approximate_with_polygon' internally.
     """
 
-    def _get_default_asset_list(self):
+    def _get_asset_list(self):
         """
         Example default set of assets for daily market cap.
         """
-        assets = get_stock_assets()
-        return assets
+        self.asset_list = get_stock_assets()
+        return self.asset_list
 
     def _get_provider_data(self, from_date: datetime, symbol: str, to_date: datetime) -> pd.DataFrame:
         """
@@ -220,10 +207,10 @@ class PolygonQFundamentals(PolygonBaseTimeSeries):
     (e.g. approximate_with_polygon_fundamentals) and registers itself differently.
     """
 
-    def _get_default_asset_list(self):
+    def _get_asset_list(self):
         # Example only; pick whichever set of assets applies to 'fundamentals'
-        assets = get_stock_assets()
-        return assets
+        self.asset_list = get_stock_assets()
+        return self.asset_list
 
     def _get_provider_data(self, from_date: datetime, symbol: str, to_date: datetime) -> pd.DataFrame:
         """
