@@ -468,6 +468,23 @@ class BinanceHistoricalBars(BaseBinanceEndpoint, TimeSerie):
 
         self.bars_source = "binance_bars"
 
+
+    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
+        """
+
+        """
+        if self.use_vam_assets == True and self.frequency_id != "1m":
+            CANONICAL_FUNDAMENTALS_ID = f"binance_{self.frequency_id}_bars"
+
+            meta=ms_client.TableMetaData(  identifier=CANONICAL_FUNDAMENTALS_ID,
+                                           description=f"Binance {self.frequency_id} bars, does not include vwap",
+                                           data_frequency_id=self.frequency_id,
+                                                   )
+
+
+            return meta
+        return None
+
     def  _run_post_update_routines(self, error_on_last_update,update_statistics):
         """
         Use post init routines to configure the time series
@@ -484,17 +501,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint, TimeSerie):
             self.logger.warning("Do not register data source due to error during run")
             return
 
-        if self.use_vam_assets == True and self.frequency_id != "1m":
-            markets_time_series_identifier = f"binance_{self.frequency_id}_bars"
 
-            markets_time_serie = register_mts_in_backed(
-                unique_identifier=markets_time_series_identifier,
-                time_serie=self,
-                description=f"Binance {self.frequency_id} bars, does not include vwap",
-                asset_list=update_statistics.asset_list,
-                data_frequency_id=self.frequency_id,
-
-            )
 
 class BinanceBarsFromTrades(BaseBinanceEndpoint, TimeSerie):
     """

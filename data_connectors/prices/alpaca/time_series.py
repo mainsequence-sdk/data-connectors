@@ -392,6 +392,22 @@ class AlpacaEquityBars(TimeSerie):
         bars_request_df = self._align_timestamps(bars_request_df, stats, cals)
         return bars_request_df
 
+
+    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
+        """
+
+        """
+        if self.use_vam_assets == True:
+            TS_ID = f"alpaca_{self.frequency_id}_bars"
+            meta=ms_client.TableMetaData(  identifier=TS_ID,
+                                           description=f"Alpaca {self.frequency_id} Bars",
+                                           data_frequency_id=self.frequency_id,
+                                                   )
+
+
+            return meta
+        return None
+
     def _run_post_update_routines(self, error_on_last_update,update_statistics:DataUpdates):
         super().run_after_post_init_routines()
 
@@ -404,14 +420,4 @@ class AlpacaEquityBars(TimeSerie):
         if error_on_last_update:
             self.logger.warning("Do not register data source due to error during run")
             return
-
-        if self.use_vam_assets == True:
-            markets_time_series_identifier = f"alpaca_{self.frequency_id}_bars"
-            markets_time_serie = register_mts_in_backed(
-                unique_identifier=markets_time_series_identifier,
-                time_serie=self,
-                description=f"Alpaca {self.frequency_id} Bars",
-                data_frequency_id=self.frequency_id,
-                asset_list=update_statistics.asset_list
-            )
 

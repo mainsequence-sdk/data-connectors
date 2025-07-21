@@ -110,31 +110,23 @@ class ImportValmer(TimeSerie):
         self._set_column_metadata()
         return source_data
 
-    def _run_post_update_routines(self, error_on_last_update, update_statistics: DataUpdates):
+
+    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
+        """
+
+        """
+
         MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "vector_de_precios_valmer"
-        source_table=self.local_time_serie.remote_table
 
-        try:
-            markets_time_series_details = MarketsTimeSeriesDetails.get(
-                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
-            )
-            if markets_time_series_details.source_table.id != source_table.id:
-                markets_time_series_details = markets_time_series_details.patch(
-                    source_table__id=source_table.id)
-        except DoesNotExist:
-            markets_time_series_details = MarketsTimeSeriesDetails.update_or_create(
-                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
-                source_table__id=source_table.id,
-                data_frequency_id=DataFrequency.one_d,
-                description="This time series contains the valuation prices from the price provider VALMER",
-            )
+        meta=ms_client.TableMetaData(  identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+                                       data_frequency_id=DataFrequency.one_d,
+                                       description="This time series contains the valuation prices from the price provider VALMER",
+                                               )
 
-        new_assets = []
-        for asset in update_statistics.asset_list:
-            if asset.id not in markets_time_series_details.assets_in_data_source:
-                new_assets.append(asset)
 
-        markets_time_series_details.append_asset_list_source(asset_list=new_assets)
+        return meta
+
+
 
 
 if __name__ == "__main__":
