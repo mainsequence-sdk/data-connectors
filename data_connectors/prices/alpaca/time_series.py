@@ -1,5 +1,5 @@
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
-from mainsequence.client import DataUpdates, AssetCurrencyPair, Asset, DataFrequency, MARKETS_CONSTANTS, AssetCategory
+from mainsequence.client import UpdateStatistics, AssetCurrencyPair, Asset, DataFrequency, MARKETS_CONSTANTS, AssetCategory
 from alpaca.data.requests import CryptoBarsRequest
 from alpaca.data.historical import CryptoHistoricalDataClient
 
@@ -219,8 +219,8 @@ class AlpacaEquityBars(TimeSerie):
         return self.asset_list
 
     # Add this new helper method to your AlpacaEquityBars class
-    def _prepare_update_scope(self, update_statistics: DataUpdates) -> Tuple[
-        bool, DataUpdates, datetime.datetime, Dict]:
+    def _prepare_update_scope(self, update_statistics: UpdateStatistics) -> Tuple[
+        bool, UpdateStatistics, datetime.datetime, Dict]:
         """
         Prepares all variables needed for an update run. It replicates the initial
         setup block from the original update method precisely.
@@ -228,7 +228,7 @@ class AlpacaEquityBars(TimeSerie):
         Returns:
             A tuple containing:
             - bool: True if the update should proceed, False otherwise.
-            - DataUpdates: The potentially modified statistics object.
+            - UpdateStatistics: The potentially modified statistics object.
             - datetime: The final 'last_available_value' to use for fetching.
             - dict: The dictionary of market calendars.
         """
@@ -269,7 +269,7 @@ class AlpacaEquityBars(TimeSerie):
 
         return True, update_statistics, last_available_value, calendars
 
-    def _fetch_data_concurrently(self, assets_to_update: list, update_statistics: DataUpdates,
+    def _fetch_data_concurrently(self, assets_to_update: list, update_statistics: UpdateStatistics,
                                  calendars: dict) -> pd.DataFrame:
         """
         Uses a thread pool to fetch data for all specified assets from the Alpaca API.
@@ -313,7 +313,7 @@ class AlpacaEquityBars(TimeSerie):
 
         return pd.concat(bars_request_df, axis=0)
 
-    def _align_timestamps(self, bars_request_df: pd.DataFrame, update_statistics: DataUpdates,
+    def _align_timestamps(self, bars_request_df: pd.DataFrame, update_statistics: UpdateStatistics,
                           calendars: dict) -> pd.DataFrame:
         """
         Processes the raw DataFrame to align timestamps, set the correct index,
@@ -364,7 +364,7 @@ class AlpacaEquityBars(TimeSerie):
 
         return bars_request_df
 
-    def update(self, update_statistics: DataUpdates):
+    def update(self, update_statistics: UpdateStatistics):
         """
            [Core Logic] Fetches new bar data from the Alpaca API.
 
@@ -408,7 +408,7 @@ class AlpacaEquityBars(TimeSerie):
             return meta
         return None
 
-    def _run_post_update_routines(self, error_on_last_update,update_statistics:DataUpdates):
+    def _run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
         super().run_after_post_init_routines()
 
         if self.metadata is None:

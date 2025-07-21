@@ -3,7 +3,7 @@
 
 import pandas as pd
 from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.client import (DataUpdates, MARKETS_CONSTANTS, Asset, AssetCurrencyPair)
+from mainsequence.client import (UpdateStatistics, MARKETS_CONSTANTS, Asset, AssetCurrencyPair)
 from datetime import datetime, timedelta
 import pytz
 from typing import List, Optional
@@ -60,7 +60,7 @@ class CoinGeckoMarketCap(TimeSerie):
             )
             return asset_list
 
-    def update(self, update_statistics: "DataUpdates"):
+    def update(self, update_statistics: "UpdateStatistics"):
         """
         Generic update that loops over assets, figures out from_date, calls
         the specialized _get_provider_data(...) and returns a DataFrame.
@@ -102,7 +102,7 @@ class CoinGeckoMarketCap(TimeSerie):
 
 
 
-    def _run_post_update_routines(self, error_on_last_update,update_statistics:DataUpdates):
+    def _run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
         """
         Common post-update steps plus a call to subclass's `_register_in_backend`.
         """

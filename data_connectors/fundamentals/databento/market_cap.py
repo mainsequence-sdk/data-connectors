@@ -6,7 +6,7 @@ import databento as db
 import pandas as pd
 import pytz
 from mainsequence.client import (
-    DataUpdates, Asset, MarketsTimeSeriesDetails, DataFrequency,
+    UpdateStatistics, Asset, MarketsTimeSeriesDetails, DataFrequency,
     AssetTranslationRule, AssetFilter, MARKETS_CONSTANTS
 )
 from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
@@ -61,7 +61,7 @@ class DatabentoMarketCap(TimeSerie):
             self.asset_list = get_stock_assets()
         return self.asset_list
 
-    def update(self, update_statistics: "DataUpdates"):
+    def update(self, update_statistics: "UpdateStatistics"):
         """
         Calculates market cap on a per-asset basis. For each asset, it fetches new price data
         and then queries for shares outstanding only over the time period for which new prices were found.
@@ -143,7 +143,7 @@ class DatabentoMarketCap(TimeSerie):
 
         return final_df
 
-    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: "DataUpdates"):
+    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: "UpdateStatistics"):
         if error_on_last_update:
             self.logger.warning("Do not register data source due to error during run")
             return

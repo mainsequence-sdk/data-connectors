@@ -8,7 +8,7 @@ import pandas_market_calendars as mcal
 import databento as db
 import pandas as pd
 import pytz
-from mainsequence.client import DataUpdates, Asset
+from mainsequence.client import UpdateStatistics, Asset
 from mainsequence.tdag.time_series import TimeSerie, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -95,7 +95,7 @@ class DatabentoHistoricalBars(TimeSerie):
             self.logger.error(f"Error fetching data for {asset.ticker} from Databento: {e}")
             return None
 
-    def update(self, update_statistics: "DataUpdates"):
+    def update(self, update_statistics: "UpdateStatistics"):
         """
         Fetches updates for all assets in parallel.
         """
@@ -221,7 +221,7 @@ class DatabentoHistoricalBars(TimeSerie):
 
         return bars_request_df
 
-    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: "DataUpdates"):
+    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: "UpdateStatistics"):
         """
         Registers the time series in the backend after a successful update.
         """
