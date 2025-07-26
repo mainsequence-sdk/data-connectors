@@ -1,0 +1,486 @@
+2025-07-26 15:06:02,170 - MainProcess - MainThread - INFO - Starting crawler with 63 aggregator workers for 5 symbols.
+2025-07-26 15:06:02,389 - MainProcess - Distributor - INFO - Distributor thread started.
+2025-07-26 15:06:02,396 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:06:02,853 - MainProcess - MainThread - INFO - Starting Binance producer for 5 symbols.
+2025-07-26 15:06:02,853 - MainProcess - MainThread - INFO - Starting trade watch loop for BTC/USDT
+2025-07-26 15:06:02,854 - MainProcess - MainThread - INFO - Starting trade watch loop for ETH/USDT
+2025-07-26 15:06:02,854 - MainProcess - MainThread - INFO - Starting trade watch loop for SOL/USDT
+2025-07-26 15:06:02,854 - MainProcess - MainThread - INFO - Starting trade watch loop for XRP/USDT
+2025-07-26 15:06:02,854 - MainProcess - MainThread - INFO - Starting trade watch loop for DOGE/USDT
+2025-07-26 15:06:03,859 - ForkProcess-2 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,092 - ForkProcess-5 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,172 - ForkProcess-6 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,241 - ForkProcess-7 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,308 - ForkProcess-8 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,343 - ForkProcess-9 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,406 - ForkProcess-10 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,421 - ForkProcess-12 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,433 - ForkProcess-14 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,460 - ForkProcess-11 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,479 - ForkProcess-13 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,493 - ForkProcess-15 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,538 - ForkProcess-17 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,545 - ForkProcess-16 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,548 - ForkProcess-18 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,557 - ForkProcess-19 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,585 - ForkProcess-25 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,587 - ForkProcess-20 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,592 - ForkProcess-21 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,593 - ForkProcess-24 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,604 - ForkProcess-22 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,604 - ForkProcess-23 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,611 - ForkProcess-28 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,624 - ForkProcess-26 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,636 - ForkProcess-31 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,650 - ForkProcess-30 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,659 - ForkProcess-27 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,663 - ForkProcess-36 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,665 - ForkProcess-38 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,668 - ForkProcess-29 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,669 - ForkProcess-34 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,670 - ForkProcess-33 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,680 - ForkProcess-32 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,689 - ForkProcess-37 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,696 - ForkProcess-35 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,709 - ForkProcess-39 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,714 - ForkProcess-43 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,718 - ForkProcess-45 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,721 - ForkProcess-46 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,724 - ForkProcess-44 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,727 - ForkProcess-42 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,733 - ForkProcess-41 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,734 - ForkProcess-48 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,736 - ForkProcess-40 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,737 - ForkProcess-47 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,738 - ForkProcess-54 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,739 - ForkProcess-52 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,747 - ForkProcess-50 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,747 - ForkProcess-49 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,749 - ForkProcess-57 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,772 - ForkProcess-53 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,775 - ForkProcess-51 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,777 - ForkProcess-60 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,781 - ForkProcess-56 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,783 - ForkProcess-55 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,788 - ForkProcess-63 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,788 - ForkProcess-62 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,789 - ForkProcess-65 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,790 - ForkProcess-58 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,791 - ForkProcess-61 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:04,792 - ForkProcess-59 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:06:12,427 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:06:22,437 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:06:32,448 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:06:42,458 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:06:52,468 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:07:02,478 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 3}
+2025-07-26 15:07:12,488 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 3}
+2025-07-26 15:07:22,495 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 3}
+2025-07-26 15:07:32,503 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 3}
+2025-07-26 15:07:42,513 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 3}
+2025-07-26 15:07:52,518 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 3}
+2025-07-26 15:08:02,528 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 6}
+2025-07-26 15:08:12,538 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 6}
+2025-07-26 15:08:22,546 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 6}
+2025-07-26 15:08:32,557 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 6}
+2025-07-26 15:08:42,567 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 6}
+2025-07-26 15:08:52,577 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 6}
+2025-07-26 15:09:02,588 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 9}
+2025-07-26 15:09:12,597 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 9}
+2025-07-26 15:09:22,608 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 9}
+2025-07-26 15:09:32,618 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 9}
+2025-07-26 15:09:42,627 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 9}
+2025-07-26 15:09:52,637 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 9}
+2025-07-26 15:10:02,644 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 12}
+2025-07-26 15:10:12,654 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 12}
+2025-07-26 15:10:22,664 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 12}
+2025-07-26 15:10:32,673 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 12}
+2025-07-26 15:10:42,677 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 12}
+2025-07-26 15:10:43,541 - MainProcess - MainThread - INFO - Shutdown signal received. Stopping all components.
+2025-07-26 15:10:56,637 - MainProcess - MainThread - INFO - Starting crawler with 63 aggregator workers for 5 symbols.
+2025-07-26 15:10:56,856 - MainProcess - Distributor - INFO - Distributor thread started.
+2025-07-26 15:10:56,875 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:10:57,283 - MainProcess - MainThread - INFO - Starting Binance producer for 5 symbols.
+2025-07-26 15:10:57,284 - MainProcess - MainThread - INFO - Starting trade watch loop for BTC/USDT
+2025-07-26 15:10:57,284 - MainProcess - MainThread - INFO - Starting trade watch loop for ETH/USDT
+2025-07-26 15:10:57,284 - MainProcess - MainThread - INFO - Starting trade watch loop for SOL/USDT
+2025-07-26 15:10:57,284 - MainProcess - MainThread - INFO - Starting trade watch loop for XRP/USDT
+2025-07-26 15:10:57,284 - MainProcess - MainThread - INFO - Starting trade watch loop for DOGE/USDT
+2025-07-26 15:10:58,313 - ForkProcess-2 - MainThread - ERROR - Writer process encountered a fatal error and is shutting down: DataWriter.__init__() got multiple values for argument 'logger'
+Traceback (most recent call last):
+  File "/home/jose/code/MainSequenceClientSide/data-connectors/data_connectors/websockets/__main__.py", line 84, in run_writer_process
+    writer = DataWriter(dsn, data_queue, logger=logger)
+TypeError: DataWriter.__init__() got multiple values for argument 'logger'
+2025-07-26 15:10:58,352 - ForkProcess-3 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,406 - ForkProcess-2 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,616 - ForkProcess-4 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,678 - ForkProcess-5 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,752 - ForkProcess-7 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,755 - ForkProcess-6 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,758 - ForkProcess-9 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,843 - ForkProcess-8 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,871 - ForkProcess-11 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,903 - ForkProcess-12 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,903 - ForkProcess-15 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,919 - ForkProcess-10 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,930 - ForkProcess-13 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,942 - ForkProcess-14 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,949 - ForkProcess-17 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:58,993 - ForkProcess-16 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,012 - ForkProcess-19 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,017 - ForkProcess-20 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,032 - ForkProcess-18 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,047 - ForkProcess-29 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,052 - ForkProcess-21 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,059 - ForkProcess-22 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,072 - ForkProcess-23 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,078 - ForkProcess-28 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,085 - ForkProcess-24 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,087 - ForkProcess-31 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,093 - ForkProcess-25 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,097 - ForkProcess-27 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,103 - ForkProcess-26 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,106 - ForkProcess-35 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,122 - ForkProcess-34 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,125 - ForkProcess-30 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,132 - ForkProcess-37 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,134 - ForkProcess-33 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,136 - ForkProcess-36 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,147 - ForkProcess-32 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,148 - ForkProcess-41 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,151 - ForkProcess-40 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,152 - ForkProcess-38 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,160 - ForkProcess-46 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,162 - ForkProcess-43 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,167 - ForkProcess-39 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,171 - ForkProcess-44 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,177 - ForkProcess-45 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,181 - ForkProcess-47 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,182 - ForkProcess-48 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,186 - ForkProcess-51 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,187 - ForkProcess-54 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,187 - ForkProcess-52 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,220 - ForkProcess-42 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,221 - ForkProcess-55 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,223 - ForkProcess-50 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,224 - ForkProcess-53 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,225 - ForkProcess-59 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,226 - ForkProcess-49 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,227 - ForkProcess-56 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,227 - ForkProcess-61 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,233 - ForkProcess-58 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,236 - ForkProcess-57 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,236 - ForkProcess-60 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,238 - ForkProcess-64 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,238 - ForkProcess-65 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:10:59,240 - ForkProcess-63 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:05,493 - MainProcess - MainThread - INFO - Shutdown signal received. Stopping all components.
+2025-07-26 15:11:47,256 - MainProcess - MainThread - INFO - Starting crawler with 63 aggregator workers for 5 symbols.
+2025-07-26 15:11:47,479 - MainProcess - Distributor - INFO - Distributor thread started.
+2025-07-26 15:11:47,480 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:11:47,957 - MainProcess - MainThread - INFO - Starting Binance producer for 5 symbols.
+2025-07-26 15:11:47,958 - MainProcess - MainThread - INFO - Starting trade watch loop for BTC/USDT
+2025-07-26 15:11:47,958 - MainProcess - MainThread - INFO - Starting trade watch loop for ETH/USDT
+2025-07-26 15:11:47,958 - MainProcess - MainThread - INFO - Starting trade watch loop for SOL/USDT
+2025-07-26 15:11:47,958 - MainProcess - MainThread - INFO - Starting trade watch loop for XRP/USDT
+2025-07-26 15:11:47,959 - MainProcess - MainThread - INFO - Starting trade watch loop for DOGE/USDT
+2025-07-26 15:11:48,895 - ForkProcess-2 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,028 - ForkProcess-3 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,101 - ForkProcess-4 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,264 - ForkProcess-6 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,306 - ForkProcess-5 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,318 - ForkProcess-7 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,445 - ForkProcess-8 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,457 - ForkProcess-9 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,481 - ForkProcess-11 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,489 - ForkProcess-10 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,539 - ForkProcess-13 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,565 - ForkProcess-14 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,574 - ForkProcess-12 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,589 - ForkProcess-15 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,595 - ForkProcess-17 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,615 - ForkProcess-16 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,637 - ForkProcess-20 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,655 - ForkProcess-18 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,664 - ForkProcess-19 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,718 - ForkProcess-25 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,727 - ForkProcess-21 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,729 - ForkProcess-23 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,731 - ForkProcess-26 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,741 - ForkProcess-22 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,742 - ForkProcess-24 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,748 - ForkProcess-28 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,771 - ForkProcess-29 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,775 - ForkProcess-27 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,787 - ForkProcess-33 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,794 - ForkProcess-39 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,798 - ForkProcess-34 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,805 - ForkProcess-35 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,811 - ForkProcess-31 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,813 - ForkProcess-38 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,819 - ForkProcess-41 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,819 - ForkProcess-30 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,820 - ForkProcess-32 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,831 - ForkProcess-36 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,833 - ForkProcess-40 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,839 - ForkProcess-42 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,848 - ForkProcess-43 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,853 - ForkProcess-37 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,857 - ForkProcess-44 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,860 - ForkProcess-47 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,865 - ForkProcess-46 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,868 - ForkProcess-50 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,872 - ForkProcess-48 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,874 - ForkProcess-51 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,874 - ForkProcess-45 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,894 - ForkProcess-56 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,895 - ForkProcess-49 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,898 - ForkProcess-57 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,899 - ForkProcess-52 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,903 - ForkProcess-53 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,904 - ForkProcess-54 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,907 - ForkProcess-61 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,908 - ForkProcess-58 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,909 - ForkProcess-62 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,909 - ForkProcess-65 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,910 - ForkProcess-59 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,913 - ForkProcess-55 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,915 - ForkProcess-60 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:49,916 - ForkProcess-63 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:11:57,491 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:12:01,992 - MainProcess - Distributor - INFO - Distributor has processed 1000 trades.
+2025-07-26 15:12:07,501 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 5}
+2025-07-26 15:12:14,723 - MainProcess - Distributor - INFO - Distributor has processed 2000 trades.
+2025-07-26 15:12:17,511 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 5}
+2025-07-26 15:12:27,521 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 5}
+2025-07-26 15:12:37,532 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 5}
+2025-07-26 15:12:45,328 - MainProcess - Distributor - INFO - Distributor has processed 3000 trades.
+2025-07-26 15:12:47,542 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 5}
+2025-07-26 15:12:57,552 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 5}
+2025-07-26 15:13:07,558 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 10}
+2025-07-26 15:13:08,765 - MainProcess - Distributor - INFO - Distributor has processed 4000 trades.
+2025-07-26 15:13:17,561 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 10}
+2025-07-26 15:13:22,639 - MainProcess - Distributor - INFO - Distributor has processed 5000 trades.
+2025-07-26 15:13:24,059 - MainProcess - MainThread - INFO - Shutdown signal received. Stopping all components.
+2025-07-26 15:13:27,661 - MainProcess - MainThread - INFO - Starting crawler with 63 aggregator workers for 5 symbols.
+2025-07-26 15:13:27,881 - MainProcess - Distributor - INFO - Distributor thread started.
+2025-07-26 15:13:27,907 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:13:28,307 - MainProcess - MainThread - INFO - Starting Binance producer for 5 symbols.
+2025-07-26 15:13:28,307 - MainProcess - MainThread - INFO - Starting trade watch loop for BTC/USDT
+2025-07-26 15:13:28,307 - MainProcess - MainThread - INFO - Starting trade watch loop for ETH/USDT
+2025-07-26 15:13:28,308 - MainProcess - MainThread - INFO - Starting trade watch loop for SOL/USDT
+2025-07-26 15:13:28,308 - MainProcess - MainThread - INFO - Starting trade watch loop for XRP/USDT
+2025-07-26 15:13:28,308 - MainProcess - MainThread - INFO - Starting trade watch loop for DOGE/USDT
+2025-07-26 15:13:29,369 - ForkProcess-2 - MainThread - INFO - Writer process started.
+2025-07-26 15:13:29,585 - ForkProcess-3 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,586 - ForkProcess-4 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,679 - ForkProcess-5 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,738 - ForkProcess-6 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,841 - ForkProcess-9 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,866 - ForkProcess-8 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,882 - ForkProcess-10 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,931 - ForkProcess-11 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,938 - ForkProcess-12 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,955 - ForkProcess-13 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,976 - ForkProcess-16 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,988 - ForkProcess-17 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:29,990 - ForkProcess-15 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,004 - ForkProcess-14 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,024 - ForkProcess-18 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,037 - ForkProcess-19 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,042 - ForkProcess-20 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,062 - ForkProcess-21 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,074 - ForkProcess-24 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,082 - ForkProcess-23 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,091 - ForkProcess-28 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,094 - ForkProcess-22 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,095 - ForkProcess-26 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,101 - ForkProcess-29 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,106 - ForkProcess-25 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,109 - ForkProcess-30 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,114 - ForkProcess-27 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,138 - ForkProcess-32 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,140 - ForkProcess-40 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,142 - ForkProcess-38 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,144 - ForkProcess-34 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,145 - ForkProcess-31 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,148 - ForkProcess-33 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,150 - ForkProcess-35 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,154 - ForkProcess-36 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,164 - ForkProcess-37 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,164 - ForkProcess-41 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,165 - ForkProcess-48 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,178 - ForkProcess-43 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,179 - ForkProcess-42 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,181 - ForkProcess-49 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,182 - ForkProcess-39 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,196 - ForkProcess-44 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,196 - ForkProcess-46 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,199 - ForkProcess-47 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,201 - ForkProcess-45 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,204 - ForkProcess-50 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,207 - ForkProcess-51 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,232 - ForkProcess-56 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,236 - ForkProcess-60 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,236 - ForkProcess-55 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,237 - ForkProcess-52 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,237 - ForkProcess-57 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,238 - ForkProcess-61 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,239 - ForkProcess-63 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,239 - ForkProcess-53 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,239 - ForkProcess-64 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,241 - ForkProcess-59 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,241 - ForkProcess-62 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,243 - ForkProcess-54 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,247 - ForkProcess-58 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:30,249 - ForkProcess-65 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:13:37,922 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:13:47,336 - MainProcess - Distributor - INFO - Distributor has processed 1000 trades.
+2025-07-26 15:13:47,933 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:13:57,943 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:14:00,293 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:14:00,294 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "DOGE/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:14:00", "open": 0.23751, "first_trade_time": "2025-07-26T13:13:32.475000", "volume": 397010.0, "turnover": 94336.05177999992, "high": 0.23771, "low": 0.23751, "close": 0.23765, "last_trade_time": "2025-07-26T13:13:59.921000", "vwap": 0.23761631137754696}
+2025-07-26 15:14:00,357 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:14:00,357 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "ETH/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:14:00", "open": 3747.08, "first_trade_time": "2025-07-26T13:13:32.115000", "volume": 124.63029999999947, "turnover": 467107.1270760001, "high": 3749.35, "low": 3747.08, "close": 3749.34, "last_trade_time": "2025-07-26T13:13:59.433000", "vwap": 3747.941929659177}
+2025-07-26 15:14:00,511 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:14:00,511 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "SOL/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:14:00", "open": 187.75, "first_trade_time": "2025-07-26T13:13:32.455000", "volume": 589.1689999999999, "turnover": 110632.42859000004, "high": 187.81, "low": 187.74, "close": 187.81, "last_trade_time": "2025-07-26T13:13:59.676000", "vwap": 187.77707005969435}
+2025-07-26 15:14:00,515 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:14:00,515 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "BTC/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:14:00", "open": 118119.99, "first_trade_time": "2025-07-26T13:13:32.136000", "volume": 2.4962500000000034, "turnover": 294857.02640010085, "high": 118120.0, "low": 118119.99, "close": 118119.99, "last_trade_time": "2025-07-26T13:13:59.708000", "vwap": 118119.99054585896}
+2025-07-26 15:14:01,516 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:14:01,516 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "XRP/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:14:00", "open": 3.1841, "first_trade_time": "2025-07-26T13:13:32.399000", "volume": 10664.300000000012, "turnover": 33959.47511000002, "high": 3.1849, "low": 3.184, "close": 3.1846, "last_trade_time": "2025-07-26T13:13:59.953000", "vwap": 3.1844073319392723}
+2025-07-26 15:14:02,129 - MainProcess - Distributor - INFO - Distributor has processed 2000 trades.
+2025-07-26 15:14:07,954 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:14:17,957 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:14:19,796 - MainProcess - Distributor - INFO - Distributor has processed 3000 trades.
+2025-07-26 15:14:27,967 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:14:30,989 - MainProcess - Distributor - INFO - Distributor has processed 4000 trades.
+2025-07-26 15:14:37,974 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:14:39,698 - MainProcess - Distributor - INFO - Distributor has processed 5000 trades.
+2025-07-26 15:14:46,616 - MainProcess - Distributor - INFO - Distributor has processed 6000 trades.
+2025-07-26 15:14:47,984 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:14:57,807 - MainProcess - Distributor - INFO - Distributor has processed 7000 trades.
+2025-07-26 15:14:57,993 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:15:00,170 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:15:00,171 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "BTC/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:15:00", "open": 118119.99, "first_trade_time": "2025-07-26T13:14:00.393000", "volume": 5.496829999999973, "turnover": 649225.6464764999, "high": 118120.0, "low": 118100.0, "close": 118117.24, "last_trade_time": "2025-07-26T13:14:59.904000", "vwap": 118109.10042269874}
+2025-07-26 15:15:00,313 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:15:00,313 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "ETH/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:15:00", "open": 3749.34, "first_trade_time": "2025-07-26T13:14:00.237000", "volume": 1105.7359999999976, "turnover": 4146377.52584299, "high": 3751.01, "low": 3748.99, "close": 3749.69, "last_trade_time": "2025-07-26T13:14:58.477000", "vwap": 3749.880193683663}
+2025-07-26 15:15:00,509 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:15:00,509 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "SOL/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:15:00", "open": 187.8, "first_trade_time": "2025-07-26T13:14:00.388000", "volume": 3281.8709999999946, "turnover": 616295.0548700073, "high": 187.83, "low": 187.7, "close": 187.74, "last_trade_time": "2025-07-26T13:14:59.336000", "vwap": 187.7877146511878}
+2025-07-26 15:15:00,525 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:15:00,525 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "XRP/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:15:00", "open": 3.1846, "first_trade_time": "2025-07-26T13:14:01.396000", "volume": 65993.89999999985, "turnover": 210081.1530999999, "high": 3.1849, "low": 3.1825, "close": 3.1832, "last_trade_time": "2025-07-26T13:14:59.858000", "vwap": 3.1833419922144377}
+2025-07-26 15:15:05,008 - MainProcess - Distributor - INFO - Distributor has processed 8000 trades.
+2025-07-26 15:15:05,231 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:15:05,231 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "DOGE/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:15:00", "open": 0.23765, "first_trade_time": "2025-07-26T13:14:00.173000", "volume": 356320.0, "turnover": 84699.84654000019, "high": 0.23777, "low": 0.23765, "close": 0.23774, "last_trade_time": "2025-07-26T13:14:57.985000", "vwap": 0.23770724781095698}
+2025-07-26 15:15:08,003 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:15:11,948 - MainProcess - Distributor - INFO - Distributor has processed 9000 trades.
+2025-07-26 15:15:18,009 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:15:23,639 - MainProcess - Distributor - INFO - Distributor has processed 10000 trades.
+2025-07-26 15:15:28,014 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:15:38,025 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:15:47,511 - MainProcess - Distributor - INFO - Distributor has processed 11000 trades.
+2025-07-26 15:15:48,033 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:15:56,702 - MainProcess - MainThread - INFO - Shutdown signal received. Stopping all components.
+2025-07-26 15:15:59,128 - MainProcess - MainThread - INFO - Starting crawler with 4 aggregator workers for 5 symbols.
+2025-07-26 15:15:59,258 - MainProcess - Distributor - INFO - Distributor thread started.
+2025-07-26 15:15:59,294 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:15:59,320 - MainProcess - MainThread - INFO - Starting Binance producer for 5 symbols.
+2025-07-26 15:15:59,320 - MainProcess - MainThread - INFO - Starting trade watch loop for BTC/USDT
+2025-07-26 15:15:59,320 - MainProcess - MainThread - INFO - Starting trade watch loop for ETH/USDT
+2025-07-26 15:15:59,320 - MainProcess - MainThread - INFO - Starting trade watch loop for SOL/USDT
+2025-07-26 15:15:59,320 - MainProcess - MainThread - INFO - Starting trade watch loop for XRP/USDT
+2025-07-26 15:15:59,320 - MainProcess - MainThread - INFO - Starting trade watch loop for DOGE/USDT
+2025-07-26 15:15:59,375 - ForkProcess-2 - MainThread - INFO - Writer process started.
+2025-07-26 15:15:59,380 - ForkProcess-3 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:15:59,385 - ForkProcess-4 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:15:59,390 - ForkProcess-5 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:15:59,392 - ForkProcess-6 - MainThread - INFO - Aggregator process started for 1-min bars.
+2025-07-26 15:16:09,309 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:16:14,388 - MainProcess - Distributor - INFO - Distributor has processed 1000 trades.
+2025-07-26 15:16:19,316 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:16:21,496 - MainProcess - Distributor - INFO - Distributor has processed 2000 trades.
+2025-07-26 15:16:29,327 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:16:38,195 - MainProcess - Distributor - INFO - Distributor has processed 3000 trades.
+2025-07-26 15:16:39,337 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:16:43,258 - MainProcess - Distributor - INFO - Distributor has processed 4000 trades.
+2025-07-26 15:16:45,553 - MainProcess - Distributor - INFO - Distributor has processed 5000 trades.
+2025-07-26 15:16:48,949 - MainProcess - Distributor - INFO - Distributor has processed 6000 trades.
+2025-07-26 15:16:49,348 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:16:54,429 - MainProcess - Distributor - INFO - Distributor has processed 7000 trades.
+2025-07-26 15:16:59,359 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:17:00,163 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:17:00,164 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "DOGE/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:17:00", "open": 0.23755, "first_trade_time": "2025-07-26T13:16:02.824000", "volume": 243415.0, "turnover": 57820.35610999999, "high": 0.2377, "low": 0.23723, "close": 0.23723, "last_trade_time": "2025-07-26T13:16:58.563000", "vwap": 0.23753818010393768}
+2025-07-26 15:17:00,174 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:17:00,174 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "ETH/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:17:00", "open": 3747.76, "first_trade_time": "2025-07-26T13:16:02.871000", "volume": 361.24559999999843, "turnover": 1354028.3518960003, "high": 3749.43, "low": 3745.75, "close": 3745.76, "last_trade_time": "2025-07-26T13:16:59.129000", "vwap": 3748.2210216429107}
+2025-07-26 15:17:00,190 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:17:00,190 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "SOL/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:17:00", "open": 187.64, "first_trade_time": "2025-07-26T13:16:03.340000", "volume": 1546.449000000001, "turnover": 290022.9350500012, "high": 187.67, "low": 187.45, "close": 187.48, "last_trade_time": "2025-07-26T13:16:59.885000", "vwap": 187.54122188963296}
+2025-07-26 15:17:00,198 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:17:00,199 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "XRP/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:17:00", "open": 3.1811, "first_trade_time": "2025-07-26T13:16:03.360000", "volume": 47590.19999999972, "turnover": 151428.92516000057, "high": 3.1831, "low": 3.1808, "close": 3.1808, "last_trade_time": "2025-07-26T13:16:59.773000", "vwap": 3.1819350446100554}
+2025-07-26 15:17:00,535 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:17:00,536 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "BTC/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:17:00", "open": 118125.0, "first_trade_time": "2025-07-26T13:16:02.956000", "volume": 35.10533000000123, "turnover": 4147739.712128586, "high": 118194.22, "low": 118088.0, "close": 118110.45, "last_trade_time": "2025-07-26T13:16:59.689000", "vwap": 118151.28107693164}
+2025-07-26 15:17:00,861 - MainProcess - Distributor - INFO - Distributor has processed 8000 trades.
+2025-07-26 15:17:09,369 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:17:10,898 - MainProcess - Distributor - INFO - Distributor has processed 9000 trades.
+2025-07-26 15:17:19,380 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:17:29,390 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:17:37,800 - MainProcess - Distributor - INFO - Distributor has processed 10000 trades.
+2025-07-26 15:17:39,401 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:17:49,406 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:17:59,416 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:18:00,516 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:18:00,516 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "XRP/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:18:00", "open": 3.1809, "first_trade_time": "2025-07-26T13:17:00.053000", "volume": 87872.99999999991, "turnover": 279456.78236000007, "high": 3.1814, "low": 3.18, "close": 3.18, "last_trade_time": "2025-07-26T13:17:58.408000", "vwap": 3.1802349112924375}
+2025-07-26 15:18:00,529 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:18:00,529 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "BTC/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:18:00", "open": 118110.45, "first_trade_time": "2025-07-26T13:17:00.415000", "volume": 12.196539999999953, "turnover": 1440932.096517697, "high": 118168.57, "low": 118110.45, "close": 118166.22, "last_trade_time": "2025-07-26T13:17:59.380000", "vwap": 118142.6942819605}
+2025-07-26 15:18:00,702 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:18:00,702 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "SOL/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:18:00", "open": 187.49, "first_trade_time": "2025-07-26T13:17:00.052000", "volume": 698.9089999999992, "turnover": 131027.69795999967, "high": 187.53, "low": 187.45, "close": 187.51, "last_trade_time": "2025-07-26T13:17:59.680000", "vwap": 187.4746182407149}
+2025-07-26 15:18:00,947 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:18:00,947 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "ETH/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:18:00", "open": 3745.76, "first_trade_time": "2025-07-26T13:17:00.048000", "volume": 72.81699999999996, "turnover": 272792.97742799995, "high": 3746.94, "low": 3745.76, "close": 3746.88, "last_trade_time": "2025-07-26T13:17:59.375000", "vwap": 3746.2814648777085}
+2025-07-26 15:18:01,489 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:18:01,489 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "DOGE/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:18:00", "open": 0.23724, "first_trade_time": "2025-07-26T13:17:00.042000", "volume": 141900.0, "turnover": 33668.11153000009, "high": 0.23736, "low": 0.23722, "close": 0.23733, "last_trade_time": "2025-07-26T13:17:58.575000", "vwap": 0.23726646603241783}
+2025-07-26 15:18:02,829 - MainProcess - Distributor - INFO - Distributor has processed 11000 trades.
+2025-07-26 15:18:07,529 - MainProcess - Distributor - INFO - Distributor has processed 12000 trades.
+2025-07-26 15:18:09,423 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:18:19,433 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:18:28,403 - MainProcess - Distributor - INFO - Distributor has processed 13000 trades.
+2025-07-26 15:18:29,444 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:18:37,893 - MainProcess - Distributor - INFO - Distributor has processed 14000 trades.
+2025-07-26 15:18:39,451 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:18:44,383 - MainProcess - Distributor - INFO - Distributor has processed 15000 trades.
+2025-07-26 15:18:49,462 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:18:59,473 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:19:00,283 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:19:00,284 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "BTC/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:19:00", "open": 118166.21, "first_trade_time": "2025-07-26T13:18:00.408000", "volume": 23.010720000000337, "turnover": 2719167.7029190883, "high": 118201.43, "low": 118154.65, "close": 118201.42, "last_trade_time": "2025-07-26T13:18:59.918000", "vwap": 118169.60542386542}
+2025-07-26 15:19:00,284 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:19:00,285 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "DOGE/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:19:00", "open": 0.23732, "first_trade_time": "2025-07-26T13:18:01.368000", "volume": 722718.0, "turnover": 171454.5755099999, "high": 0.23746, "low": 0.23716, "close": 0.23744, "last_trade_time": "2025-07-26T13:18:58.764000", "vwap": 0.2372357897686233}
+2025-07-26 15:19:00,355 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:19:00,355 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "SOL/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:19:00", "open": 187.5, "first_trade_time": "2025-07-26T13:18:00.581000", "volume": 865.0569999999981, "turnover": 162181.43296999956, "high": 187.53, "low": 187.4, "close": 187.52, "last_trade_time": "2025-07-26T13:18:59.921000", "vwap": 187.48063187743688}
+2025-07-26 15:19:01,837 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:19:01,837 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "XRP/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:19:00", "open": 3.1801, "first_trade_time": "2025-07-26T13:18:00.396000", "volume": 99489.69999999958, "turnover": 316383.69453000027, "high": 3.1833, "low": 3.1786, "close": 3.1833, "last_trade_time": "2025-07-26T13:18:58.035000", "vwap": 3.1800648160563516}
+2025-07-26 15:19:02,232 - MainProcess - Distributor - INFO - Distributor has processed 16000 trades.
+2025-07-26 15:19:02,286 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:19:02,286 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "ETH/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:19:00", "open": 3746.87, "first_trade_time": "2025-07-26T13:18:00.827000", "volume": 181.21159999999807, "turnover": 678892.0976090009, "high": 3748.0, "low": 3745.09, "close": 3747.99, "last_trade_time": "2025-07-26T13:18:59.605000", "vwap": 3746.405294192028}
+2025-07-26 15:19:09,478 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:19:14,114 - MainProcess - Distributor - INFO - Distributor has processed 17000 trades.
+2025-07-26 15:19:19,487 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:19:29,498 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:19:35,509 - MainProcess - Distributor - INFO - Distributor has processed 18000 trades.
+2025-07-26 15:19:39,508 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:19:49,519 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:19:51,822 - MainProcess - Distributor - INFO - Distributor has processed 19000 trades.
+2025-07-26 15:19:59,527 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:20:00,134 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:20:00,134 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "DOGE/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:20:00", "open": 0.23744, "first_trade_time": "2025-07-26T13:19:00.165000", "volume": 200411.0, "turnover": 47599.24454999979, "high": 0.23762, "low": 0.23738, "close": 0.2375, "last_trade_time": "2025-07-26T13:19:58.816000", "vwap": 0.2375081435150755}
+2025-07-26 15:20:00,181 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:20:00,181 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "SOL/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:20:00", "open": 187.52, "first_trade_time": "2025-07-26T13:19:00.234000", "volume": 585.930999999998, "turnover": 109844.7288799997, "high": 187.53, "low": 187.4, "close": 187.41, "last_trade_time": "2025-07-26T13:19:59.368000", "vwap": 187.47041696035896}
+2025-07-26 15:20:00,271 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:20:00,271 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "BTC/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:20:00", "open": 118201.43, "first_trade_time": "2025-07-26T13:19:00.163000", "volume": 3.9756199999999757, "turnover": 469903.6724619005, "high": 118201.43, "low": 118189.6, "close": 118189.6, "last_trade_time": "2025-07-26T13:19:59.484000", "vwap": 118196.3247146114}
+2025-07-26 15:20:00,563 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:20:00,563 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "ETH/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:20:00", "open": 3748.0, "first_trade_time": "2025-07-26T13:19:02.167000", "volume": 89.69709999999958, "turnover": 336170.19163200044, "high": 3748.07, "low": 3747.14, "close": 3747.9, "last_trade_time": "2025-07-26T13:19:58.536000", "vwap": 3747.837908159818}
+2025-07-26 15:20:01,537 - ForkProcess-2 - MainThread - INFO - WRITING BATCH of 1 bars.
+2025-07-26 15:20:01,537 - ForkProcess-2 - MainThread - INFO - Sample bar: {"symbol": "XRP/USDT", "interval_minutes": 1, "timestamp": "2025-07-26T13:20:00", "open": 3.1833, "first_trade_time": "2025-07-26T13:19:01.716000", "volume": 39014.89999999976, "turnover": 124198.07351999971, "high": 3.1836, "low": 3.1827, "close": 3.1831, "last_trade_time": "2025-07-26T13:19:58.856000", "vwap": 3.1833497848258094}
+2025-07-26 15:20:09,537 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:20:10,941 - MainProcess - Distributor - INFO - Distributor has processed 20000 trades.
+2025-07-26 15:20:19,547 - MainProcess - HealthCheck - INFO - QUEUE SIZES: {'trades': 0, 'bars': 0}
+2025-07-26 15:20:23,342 - MainProcess - MainThread - INFO - Shutdown signal received. Stopping all components.
+2025-07-26 15:20:29,558 - MainProcess - MainThread - INFO - Application has shut down.
+2025-07-26 15:20:32,408 - MainProcess - MainThread - INFO - Producer task was cancelled.
+2025-07-26 15:20:32,408 - MainProcess - MainThread - INFO - Shutdown signal received. Stopping all components.

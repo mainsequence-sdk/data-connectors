@@ -55,7 +55,10 @@ class DatabentoMarketCap(TimeSerie):
         except Exception as e:
             self.logger.error(f"Could not instantiate APITimeSerie for prices using identifier '{self.prices_time_serie_unique_identifier}': {e}")
 
-    def _get_asset_list(self) -> List[Asset]:
+    def dependencies(self):
+        return {}
+
+    def get_asset_list(self) -> List[Asset]:
         if self.asset_list is None:
             self.logger.info(f"{self.local_hash_id} is using default stock assets.")
             self.asset_list = get_stock_assets()
@@ -167,7 +170,7 @@ class DatabentoMarketCap(TimeSerie):
                 AssetTranslationRule(
                     asset_filter=AssetFilter(
                         execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type="Common Stock",
+                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
                     ),
                     markets_time_serie_unique_identifier=markets_time_series_identifier,
                     target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,

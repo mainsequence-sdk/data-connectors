@@ -28,6 +28,8 @@ class ImportValmer(TimeSerie):
         self.artifact_data = None
         super().__init__(*args, **kwargs)
 
+    def dependencies(self):
+        return {}
 
     def _get_artifact_data(self):
         if self.artifact_data is None:

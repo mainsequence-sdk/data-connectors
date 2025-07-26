@@ -54,6 +54,9 @@ class DatabentoHistoricalBars(TimeSerie):
 
         self.client = db.Historical(key=DATABENTO_API_KEY)
 
+    def dependencies(self):
+        return {}
+
     def _get_asset_list(self) -> List[Asset]:
         """
         Returns the default asset list if none is provided.

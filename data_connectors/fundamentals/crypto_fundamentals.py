@@ -42,9 +42,10 @@ class CoinGeckoMarketCap(TimeSerie):
                 ]
             ), f"Execution Venue in all assets should be {MARKETS_CONSTANTS.FIGI_COMPOSITE_EV}"
 
+    def dependencies(self):
+        return {}
 
-
-    def _get_asset_list(self):
+    def get_asset_list(self):
         if self.asset_list is not None:
             return self.asset_list
         else:

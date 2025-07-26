@@ -51,7 +51,10 @@ class PolygonBaseTimeSeries(TimeSerie):
                 ]
             ), f"Execution Venue in all assets should be {MARKETS_CONSTANTS.FIGI_COMPOSITE_EV}"
 
-    def _get_asset_list(self) -> List:
+    def dependencies(self):
+        return {}
+
+    def get_asset_list(self) -> List:
         """
         If no asset_list is provided, this method should be overridden
         in child classes to return the default set of assets.

@@ -90,6 +90,9 @@ class AlpacaEquityBars(TimeSerie):
 
         super().__init__(*args, **kwargs)
 
+    def dependencies(self):
+        return {}
+
     def _get_timeframe(self):
         """
         Parses the frequency_id to extract the frequency amount and unit.

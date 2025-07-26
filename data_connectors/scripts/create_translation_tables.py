@@ -11,7 +11,7 @@ if __name__ == "__main__":
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                security_type="Common Stock",
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
             target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
@@ -19,7 +19,7 @@ if __name__ == "__main__":
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                security_type="Common Stock",
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
             target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
@@ -39,7 +39,7 @@ if __name__ == "__main__":
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                security_type="Common Stock",
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
             target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                security_type="Common Stock",
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
             target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
@@ -123,7 +123,7 @@ if __name__ == "__main__":
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                security_type="Common Stock",
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
             target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
@@ -131,7 +131,7 @@ if __name__ == "__main__":
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                security_type="Common Stock",
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
             target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,

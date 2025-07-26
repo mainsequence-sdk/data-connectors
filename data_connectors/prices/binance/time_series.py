@@ -239,6 +239,8 @@ class BaseBinanceEndpoint:
         if self.asset_list is not None:
             self._init_info_map(self.asset_list)
 
+    def dependencies(self):
+        return {}
     def _init_info_map(self,asset_list:list[Asset]):
         from mainsequence.client import MARKETS_CONSTANTS as CONSTANTS
 

@@ -3,14 +3,12 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
-[scripts]
-pip-install  = "pip install psycopg2-binary && pip install pgcopy --no-deps " #for timeseries orm
-
 [packages]
 python-dotenv = "*"
 pandas-market-calendars = "*"
 fire = "*"
 databento = "*"
+
 
 [requires]
 python_version = "3.9"
@@ -24,3 +22,4 @@ alpaca-py = "*"
 python-binance = "*"
 python-coinmarketcap = "*"
 pycoingecko = "*"
+ccxt = "*"
