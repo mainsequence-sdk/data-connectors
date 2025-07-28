@@ -4,7 +4,8 @@ import queue
 import json
 import logging
 import time
-
+import mainsequence.client as ms_client
+from concurrent.futures import ThreadPoolExecutor
 
 class DataWriter:
     """
@@ -12,9 +13,31 @@ class DataWriter:
     Designed to be run as the target of a multiprocessing.Process.
     """
 
-    def __init__(self, data_queue: queue.Queue, logger: logging.Logger):
+    def __init__(self,
+                 local_metadata_id:int,
+                 data_queue: queue.Queue, logger: logging.Logger):
         self.queue = data_queue
         self.logger = logger
+        self.executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ApiWorker")
+        self.local_metadata_id=local_metadata_id
+
+
+    def _send_batch_to_api(self, batch: list):
+        """
+        This function contains the blocking I/O call and is executed by a worker thread.
+        """
+        try:
+            # Using a session object is more efficient for multiple requests
+            # Submit the blocking REST call to the thread pool.
+            # This call is non-blocking and returns immediately.
+            ms_client.LocalTimeSerie.insert_data_into_table(local_metadata_id=self.local_metadata_id,
+                                                            records=batch)
+            if batch:
+                self.logger.info(f"Sample bar: {json.dumps(batch[0])}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to submit batch to API: {e}")
+            # Here you could implement logic to re-queue the failed batch if needed
 
     def run(self):
         """The main loop that pulls data from the queue and logs it."""
@@ -26,11 +49,9 @@ class DataWriter:
                 if not batch:
                     continue
 
-                # In a real app, you would send this batch to an API, database, etc.
                 self.logger.info(f"WRITING BATCH of {len(batch)} bars.")
-                # For demonstration, log the first item in the batch
-                if batch:
-                    self.logger.info(f"Sample bar: {json.dumps(batch[0])}")
+                self.executor.submit(self._send_batch_to_api, batch)
+
 
             except (IOError, EOFError):
                 self.logger.warning("Writer input queue connection lost. Exiting.")

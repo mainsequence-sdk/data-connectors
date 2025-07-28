@@ -8,10 +8,9 @@ project_root = Path(__file__).resolve().parents[1]
 env_file_path = project_root / ".env"
 
 load_dotenv(dotenv_path=env_file_path)
-from mainsequence.tdag.time_series import TimeSerie, ModelList, APITimeSerie
+from mainsequence.tdag.time_series import TimeSerie,  APITimeSerie
 
 class TestTimeSerie(TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(self, data_source_id: str, local_hash_id: str, *args, **kwargs):
         self.bars = APITimeSerie(local_hash_id=local_hash_id, data_source_id=data_source_id)
         super().__init__(*args, **kwargs)
@@ -25,21 +24,26 @@ class TestTimeSerie(TimeSerie):
         return full_data
 
 
-def test_binance_bars_from_trades():
-    from data_connectors.prices.binance.time_series import BinanceBarsFromTrades
+def test_binance_bars_from_trades(bar_type="time"):
+    from data_connectors.prices.binance.time_series import BinanceBarsFromTrades,TimeBarConfig,ImbalanceBarConfig
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
 
-    future_assets = AssetFutureUSDM.filter(symbol__in=["BTCUSDT", "ETHUSDT", "1000SHIBUSDT"])
-    spot_assets = AssetCurrencyPair.filter(symbol__in=["BTCUSDT", "ETHUSDT", "SHIBUSDT"])
-
-    # ts = BinanceBarsFromTrades(asset_list=[spot_assets[0]]+[future_assets[0]],
-    # )
-    ts = BinanceBarsFromTrades(asset_list=None)
+    future_assets = AssetFutureUSDM.filter(ticker__in=["BTCUSDT", "ETHUSDT", "1000SHIBUSDT"])
+    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTCUSDT", "ETHUSDT", "SHIBUSDT"])
+    if bar_type== "time":
+        bar_configuration=TimeBarConfig(frequency_id="1m")
+    else:
+        bar_configuration=ImbalanceBarConfig()
+    ts = BinanceBarsFromTrades(asset_list=future_assets,bar_configuration=bar_configuration)
     ts.run(debug_mode=True,force_update=True)
 
 def test_binance_daily_bars():
-    from data_connectors.prices.binance.time_series import BinanceHistoricalBars
-    ts = BinanceHistoricalBars(asset_list=None, frequency_id="1d")
+    from data_connectors.prices.binance.time_series import BinanceHistoricalBars,TimeBarConfig
+    from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
+    future_assets = AssetFutureUSDM.filter(ticker__in=["BTCUSDT", "ETHUSDT", "1000SHIBUSDT"])
+    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTCUSDT", "ETHUSDT", "SHIBUSDT"])
+
+    ts = BinanceHistoricalBars(asset_list=future_assets,  bar_configuration=TimeBarConfig(frequency_id="1d"))
     ts.run(debug_mode=True,force_update=True)
 
 
@@ -129,8 +133,8 @@ def test_equity_fundamentals():
 
 # test_api_time_series()
 # test_binance_bars_from_trades()
-# test_binance_daily_bars()
-test_alpaca_bars()
+test_binance_daily_bars()
+# test_alpaca_bars()
 # test_crypto_market_cap()
 # test_equity_market_cap()
 # test_alpaca_bars_small()

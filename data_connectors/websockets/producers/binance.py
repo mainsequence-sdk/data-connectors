@@ -13,6 +13,7 @@ class BinanceTradesProducer(ProducerBase):
         super().__init__(data_queue, logger)
         self.symbols = symbols
         self.client = ccxt.pro.binance({'newUpdates': True})
+        self.logger = logger
 
     def _format_trade(self, trade: dict) -> tuple:
         """Formats a trade from ccxt into a tuple for the database."""

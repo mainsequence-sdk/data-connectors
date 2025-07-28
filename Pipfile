@@ -9,7 +9,6 @@ pandas-market-calendars = "*"
 fire = "*"
 databento = "*"
 
-
 [requires]
 python_version = "3.9"
 
@@ -23,3 +22,4 @@ python-binance = "*"
 python-coinmarketcap = "*"
 pycoingecko = "*"
 ccxt = "*"
+numba = "*"

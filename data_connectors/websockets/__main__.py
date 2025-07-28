@@ -1,19 +1,19 @@
 # Your imports, unchanged as requested.
+from mainsequence.client import DynamicTableMetaData
+
 from data_connectors.websockets.producers.alpaca import AlpacaTradesProducer
 from data_connectors.websockets.producers.binance import BinanceTradesProducer
-from data_connectors.websockets.consumers import DataWriter
-from data_connectors.websockets.bar import BarAggregator
-import queue
-import asyncio
-import signal
-import threading
+from data_connectors.websockets.time_series import BarConfiguration,LiveBarsTimeSeries
+
+
 import logging
 import argparse
 import time
 # --- Imports for Multi-Processing ---
 import multiprocessing as mp
 import os
-from concurrent.futures import ProcessPoolExecutor
+
+import mainsequence.client as ms_client
 
 
 # --- Logger Setup ---
@@ -47,169 +47,68 @@ def setup_logger():
 
 # --- Centralized Configurations ---
 CONFIGS = {
-    "binance": {
+    "binance_futures": {
         "producer_class": BinanceTradesProducer,
-        "symbols": ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'DOGE/USDT'],  # Example with more symbols
+        "tickers": ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT'],  # Example with more symbols
+        "ticker_execution_venue":ms_client.MARKETS_CONSTANTS.BINANCE_FUTURES_EV_SYMBOL,
         "bar_interval_minutes": 1,
-        "writer_destination": "API or DB endpoint for Binance"
     },
     "alpaca": {
         "producer_class": AlpacaTradesProducer,
         "symbols": ['SPY', 'AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOG'],  # Example with more symbols
         "bar_interval_minutes": 5,
-        "writer_destination": "API or DB endpoint for Alpaca"
     }
 }
 
 
-# --- Process Target Functions ---
-# These functions are the entry points for each new process.
-
-def run_aggregator_process(input_queue, output_queue, interval_minutes):
-    """Target function to run the BarAggregator in a dedicated process."""
-    logger = setup_logger()
-    # This instantiates the imported BarAggregator class
-    aggregator = BarAggregator(input_queue, output_queue, interval_minutes, logger)
-    aggregator.run()  # This is a blocking call that starts the aggregator's loop
-
-
-def run_writer_process(data_queue):
-    """
-    Target function to run the DataWriter in a dedicated process.
-    Includes robust error handling to aid in debugging.
-    """
-    logger = setup_logger()
-    try:
-        # This instantiates the imported DataWriter class
-        writer = DataWriter( data_queue, logger=logger)
-        writer.run() # This starts the writer's loop
-    except Exception as e:
-        # If the process fails for any reason, this will log the error
-        # to the crawler.log file before the process exits.
-        logger.exception(f"Writer process encountered a fatal error and is shutting down: {e}")
-
-
-
-def distributor(input_queue, output_queues, symbol_to_worker_map, stop_event):
-    """Distributes trades from the main queue to the correct worker queue."""
-    logger = setup_logger()
-    logger.info("Distributor thread started.")
-    trade_count = 0
-    while not stop_event.is_set():
-        try:
-            trade = input_queue.get(timeout=1.0)
-            symbol = trade[1] # Assumes symbol is the second element in the trade tuple
-            worker_index = symbol_to_worker_map.get(symbol)
-            if worker_index is not None:
-                output_queues[worker_index].put(trade)
-                trade_count += 1
-                if trade_count % 1000 == 0: # Log every 1000 trades
-                    logger.info(f"Distributor has processed {trade_count} trades.")
-        except queue.Empty:
-            continue
-        except Exception as e:
-            logger.error(f"Distributor error: {e}")
-
-# --- Health Check Function ---
-def queue_health_check(queues: dict, stop_event: threading.Event):
-    """Periodically logs the size of all queues in the pipeline."""
-    logger = setup_logger()
-    while not stop_event.is_set():
-        try:
-            sizes = {name: q.qsize() for name, q in queues.items()}
-            logger.info(f"QUEUE SIZES: {sizes}")
-            time.sleep(10) # Log sizes every 10 seconds
-        except Exception as e:
-            logger.error(f"Health check error: {e}")
-
-
 # --- Main Application Logic ---
 
-def start_crawler(config: dict):
+def start_crawler(price_source:str,config: dict):
     """
     This function starts the scalable, multi-process pipeline.
     """
-    logger = setup_logger()
-    # Use N-1 CPU cores for aggregation to leave one for the main process (producer, distributor)
-    NUM_AGGREGATOR_WORKERS = min(4,max(1, os.cpu_count() - 1))
-    SYMBOLS = config["symbols"]
 
-    logger.info(f"Starting crawler with {NUM_AGGREGATOR_WORKERS} aggregator workers for {len(SYMBOLS)} symbols.")
 
-    # 1. Use a multiprocessing Manager to create queues that can be shared between processes
-    manager = mp.Manager()
-    trades_queue = manager.Queue()
-    aggregator_input_queues = [manager.Queue() for _ in range(NUM_AGGREGATOR_WORKERS)]
-    bars_queue = manager.Queue()
 
-    # 2. Map symbols to worker processes for even distribution
-    symbol_to_worker_map = {symbol: i % NUM_AGGREGATOR_WORKERS for i, symbol in enumerate(SYMBOLS)}
+    asset_list=ms_client.AssetCurrencyPair.filter(ticker__in=config["tickers"],
+                                              execution_venue__symbol=config["ticker_execution_venue"]       )
 
-    # 3. Start Distributor and Health Check Threads in the main process
-    stop_event = threading.Event()
+    bar_configuration=BarConfiguration(bar_interval_minutes=config["bar_interval_minutes"])
+    ts=LiveBarsTimeSeries(prices_source=price_source,
+                          asset_list=asset_list,
+                          bar_configuration=bar_configuration,
+                          )
 
-    distributor_thread = threading.Thread(
-        target=distributor,
-        args=(trades_queue, aggregator_input_queues, symbol_to_worker_map, stop_event),
-        name="Distributor"
-    )
-    distributor_thread.start()
+    #force the creation of the TimeSerie
+    ts.verify_and_build_remote_objects()
+    #set table metadata
+    if ts.metadata.sourcetableconfiguration is None:
+        from data_connectors.websockets.bar import Bar
+        dtypes=Bar.get_dtypes()
 
-    health_check_queues = {"trades": trades_queue, "bars": bars_queue}
-    health_check_thread = threading.Thread(
-        target=queue_health_check,
-        args=(health_check_queues, stop_event),
-        name="HealthCheck"
-    )
-    health_check_thread.start()
+        index_names=["time_index","unique_identifier"]
+        column_index_names=[c for c in list(dtypes.keys()) if c not in index_names]
+        stc = ms_client.SourceTableConfiguration.create(
+            column_dtypes_map=dtypes,
+            index_names=index_names,
+            time_index_name="time_index",
+            column_index_names=column_index_names,
+            metadata_id=ts.metadata.id
+        )
+        #reset metadata
+        metadata=ms_client.DynamicTableMetaData.get(id=stc.related_table)
+        ts.local_persist_manager._metadata_cached=metadata
 
-    # 4. Start Worker Processes using a ProcessPoolExecutor
-    # The pool will manage N aggregator processes + 1 writer process
-    process_pool = ProcessPoolExecutor(max_workers=NUM_AGGREGATOR_WORKERS + 1)
+    ts.local_persist_manager.set_table_metadata(
+        table_metadata=ts.get_table_metadata(update_statistics=None))
 
-    # Submit the single writer process
-    process_pool.submit(run_writer_process, bars_queue)
+    ts.set_producer_class(config["producer_class"])
+    ts.live_update()
 
-    # Submit the pool of aggregator processes
-    for i in range(NUM_AGGREGATOR_WORKERS):
-        process_pool.submit(run_aggregator_process, aggregator_input_queues[i], bars_queue,
-                            config["bar_interval_minutes"])
 
-    # 5. Start the async Producer in the main process
-    producer = config["producer_class"](
-        symbols=config["symbols"],
-        data_queue=trades_queue,  # Producer puts trades onto the shared queue
-        logger=logger
-    )
-    loop = asyncio.get_event_loop()
-    producer_task = loop.create_task(producer.run())
 
-    # --- Graceful Shutdown ---
-    def handle_shutdown():
-        logger.info("Shutdown signal received. Stopping all components.")
-        if not stop_event.is_set():
-            # Stop producer first to halt new data
-            if not producer_task.done():
-                loop.call_soon_threadsafe(producer_task.cancel)
-            # Stop background threads
-            stop_event.set()
-            # Shutdown the process pool, which will interrupt the workers
-            process_pool.shutdown(wait=True, cancel_futures=True)
-            # Join the threads
-            distributor_thread.join()
-            health_check_thread.join()
-            logger.info("Application has shut down.")
 
-    signal.signal(signal.SIGINT, lambda s, f: handle_shutdown())
-    signal.signal(signal.SIGTERM, lambda s, f: handle_shutdown())
 
-    try:
-        loop.run_until_complete(producer_task)
-    except asyncio.CancelledError:
-        logger.info("Producer task was cancelled.")
-    finally:
-        # Ensure final shutdown is called
-        handle_shutdown()
 
 
 def main():
@@ -226,9 +125,9 @@ def main():
     args = parser.parse_args()
     config_to_run = CONFIGS.get(args.exchange)
     if config_to_run:
-        start_crawler(config_to_run)
+        start_crawler(price_source=args.exchange,config=config_to_run)
     else:
-        logger.error(f"Invalid exchange specified. No configuration found for '{args.exchange}'.")
+        print(f"Invalid exchange specified. No configuration found for '{args.exchange}'.")
 
 
 if __name__ == "__main__":

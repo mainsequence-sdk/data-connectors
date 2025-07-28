@@ -1,236 +1,24 @@
-from mainsequence.client import MARKETS_CONSTANTS
-from mainsequence.client import MARKETS_CONSTANTS as CONSTANTS
+
 from mainsequence.logconf import logger
-import datetime
-import pandas as pd
-import pytz
+
 from tqdm import tqdm
 import os
 
 
-from io import BytesIO
 from zipfile import ZipFile
-from urllib.request import urlopen
-from urllib.error import HTTPError
-import gc
+
 import time
 import os
 import numpy as np
-from mainsequence.tdag.config import configuration
 import pandas as pd
 import requests
-import zipfile
 import io
+from requests.exceptions import RequestException
+from numba import from_dtype
+import numba
+
+
 tqdm.pandas()
-BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
-BINANCE_API_SECRET = os.getenv('BINANCE_API_SECRET')
-BINANCE_TEST_NET_API_KEY = os.getenv('BINANCE_TEST_NET_API_KEY')
-BINANCE_TEST_NET_API_SECRET = os.getenv('BINANCE_TEST_NET_API_SECRET')
-
-
-def fetch_spot_symbols_dict():
-    """
-    Fetches the entire spot exchangeInfo once and returns a dict:
-        {symbol_name: status, ...}
-    """
-    url = "https://api.binance.com/api/v3/exchangeInfo"
-    resp = requests.get(url)
-    resp.raise_for_status()  # raise an HTTPError if bad status
-    data = resp.json()
-
-    # Build a lookup dict of symbol -> status
-    return {s["symbol"]: s["status"] for s in data.get("symbols", [])}
-
-def fetch_futures_symbols_dict():
-    """
-    Fetches the entire USDM futures exchangeInfo once and returns a dict:
-        {symbol_name: status, ...}
-    """
-    url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
-    resp = requests.get(url)
-    resp.raise_for_status()
-    data = resp.json()
-
-    # Build a lookup dict of symbol -> status
-    return {s["symbol"]: s["status"] for s in data.get("symbols", [])}
-
-def timestamp_to_utc_datetime(x):
-    return datetime.datetime.utcfromtimestamp(x * 1e-3).replace(tzinfo=pytz.utc)
-
-def binance_time_stamp_to_datetime(series:pd.Series)->pd.Series:
-    return series.apply(lambda x: datetime.datetime.utcfromtimestamp(x * 1e-3))
-
-
-
-#====BAR building=====
-
-
-
-
-
-
-def get_binance_bars_endpoint(market_type, is_daily, symbol, interval):
-    """
-    Returns the appropriate Binance endpoint for bar data (candlesticks) based on market type and frequency.
-
-    Args:
-        market_type (str): "spot" or "futures" or "usdm".
-        is_daily (bool): If True, uses daily endpoints; otherwise monthly.
-        symbol (str): The trading pair symbol (e.g., "BTCUSDT").
-        interval (str): The candlestick interval (e.g., "1m", "1h", "1d").
-
-    Returns:
-        str: The constructed URL endpoint.
-    """
-    # Define root URLs
-    SPOT_DAY_ROOT_URL = "https://data.binance.vision/data/spot/daily/klines/"
-    SPOT_MONTH_ROOT_URL = "https://data.binance.vision/data/spot/monthly/klines/"
-    FUTURES_USDM_DAY_ROOT_URL = "https://data.binance.vision/data/futures/um/daily/klines/"
-    FUTURES_USDM_MONTH_ROOT_URL = "https://data.binance.vision/data/futures/um/monthly/klines/"
-
-    # Select the correct base URL
-    if market_type == MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
-        root_url = FUTURES_USDM_MONTH_ROOT_URL
-        if is_daily:
-            root_url = FUTURES_USDM_DAY_ROOT_URL
-    else:
-        root_url = SPOT_MONTH_ROOT_URL
-        if is_daily:
-            root_url = SPOT_DAY_ROOT_URL
-
-    # Construct the full endpoint (ending with / )
-    endpoint = f"{root_url}{symbol.upper()}/{interval}/"
-    return endpoint
-
-
-def fetch_binance_bars_for_single_day(
-    market_type: str,
-    is_daily: bool,
-    symbol: str,
-    interval: str,
-    single_day: datetime,
-) -> pd.DataFrame:
-    """
-    Combines the endpoint construction + single-day extraction logic into one function.
-
-    Args:
-        market_type (str): "spot" or "usdm" or "futures".
-        is_daily (bool): True if daily endpoints should be used, otherwise monthly.
-        symbol (str): e.g., "BTCUSDT".
-        interval (str): e.g., "1m", "1h", "1d".
-        single_day (datetime): The date to fetch; only year-month-day is used for the filename.
-        logger (logging.Logger): Logger instance for warnings/errors.
-
-    Returns:
-        pd.DataFrame: Candlestick data for the given day, or an empty DataFrame if not found.
-    """
-    # 1) Construct the base endpoint
-    endpoint_base = get_binance_bars_endpoint(market_type, is_daily, symbol, interval)
-
-    # 2) Extract year, month, day for the filename
-    year_str = single_day.strftime("%Y")
-    month_str = single_day.strftime("%m")
-    day_str = single_day.strftime("%d")
-
-    # 3) Prepare the ZIP filename (Binance daily naming convention)
-    #    e.g., BTCUSDT-1m-2023-06-01.zip
-    filename_zip = f"{symbol.upper()}-{interval}-{year_str}-{month_str}"
-
-    if is_daily:
-        filename_zip = f"{filename_zip}-{day_str}.zip"
-    else:
-        filename_zip = f"{filename_zip}.zip"
-    url = f"{endpoint_base}{filename_zip}"
-
-    df_day = pd.DataFrame()  # in case of error or no data
-    max_trials=3
-    trial=0
-    try:
-        while trial < max_trials:
-            resp = requests.get(url)
-            if resp.status_code == 200:
-                break
-
-            logger.debug(
-                f"No data for {symbol} on {single_day.date()}. "
-                f"Status code: {resp.status_code} | URL: {url} trial{trial}/{max_trials} "
-            )
-            time.sleep(10)
-            trial=trial+1
-            if trial >= max_trials:
-                logger.warning(
-                    f"No data for {symbol} on {single_day.date()}. "
-                    f"Status code: {resp.status_code} | URL: {url} trial{trial}/{max_trials} "
-                )
-                return df_day
-
-
-        # The CSV is inside the ZIP, so open the ZIP in memory
-        z = zipfile.ZipFile(io.BytesIO(resp.content))
-        filename_csv = filename_zip.replace(".zip", ".csv")
-
-        with z.open(filename_csv) as csv_file:
-            # Binance Klines CSV columns:
-            # 0: open_time (ms)
-            # 1: open
-            # 2: high
-            # 3: low
-            # 4: close
-            # 5: volume
-            # 6: close_time (ms)
-            # 7: quote_asset_volume
-            # 8: number_of_trades
-            # 9: taker_buy_base_asset_volume
-            # 10: taker_buy_quote_asset_volume
-            # 11: ignore
-            df_day = pd.read_csv(csv_file, header=None)
-
-            def safe_to_numeric(series):
-                """
-                Attempts to convert a Series to numeric.
-                If it fails, it returns the original unconverted Series.
-                """
-                try:
-                    return pd.to_numeric(series)
-                except (ValueError, TypeError):
-                    return series
-
-            # sometimes headers are present
-            if isinstance(df_day.iloc[0, 0], str):
-                df_day = df_day.iloc[1:]
-                df_day = df_day.apply(safe_to_numeric)
-
-            df_day.columns = [
-                "open_time",
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "close_time",
-                "quote_asset_volume",
-                "number_of_trades",
-                "taker_buy_base_asset_volume",
-                "taker_buy_quote_asset_volume",
-                "ignore"
-            ]
-
-        # 4) Convert millisecond timestamps to UTC datetime
-        if len(df_day) > 0:
-            for time_col in ["open_time", "close_time"]:
-                if df_day[time_col].iloc[0] > 2e14:  # ~2e14 = 200,000,000,000,000 => definitely microseconds
-                    df_day[time_col] //= 1000
-
-
-        df_day["close_time"] = pd.to_datetime(df_day["close_time"], unit="ms", utc=True)
-        df_day = df_day.drop(columns=["ignore"])
-        # 5) Set the 'open_time' as index (optional)
-
-    except Exception as e:
-        logger.error(f"Error downloading or reading bars for {symbol} on {single_day.date()}: {e}")
-        return pd.DataFrame()
-
-    return df_day
 
 def set_ohlc(ohlc_df):
     all_dfs = ohlc_df.set_index("bar_id")
@@ -297,147 +85,533 @@ def merge_partial_agg(global_agg, partial_agg):
             agg['sum_buyer_maker'] += row['sum_buyer_maker']
 
 
-def get_bars_by_date(url, file_root, frequency_to_seconds, bars_frequency,
-                     api_source: str, logger=None, data_df=None,
-                     chunksize=1_000_000):
+bar_dtype = np.dtype([
+    ('open',  np.float64), ('close',  np.float64),
+    ('high',  np.float64), ('low',    np.float64),
+    ('volume',               np.float64),
+    ('total_quote_volume',    np.float64),
+    ('sum_price_qty',         np.float64),
+    ('sum_buyer_maker_price_qty', np.float64),
+    ('sum_buyer_maker',       np.float64),
+    ('first_trade_time', np.int64), ('last_trade_time',  np.int64),
+    ('first_trade_id',  np.int64),  ('last_trade_id',   np.int64),
+])
+bar_agg_type = from_dtype(bar_dtype)
+
+
+@numba.njit
+def aggregate_trades_chunk(
+        bar_ids: np.ndarray,
+        prices:  np.ndarray,
+        qtys:    np.ndarray,
+        quote_qtys: np.ndarray,
+        times:   np.ndarray,
+        is_buyer_maker: np.ndarray,
+        trade_ids: np.ndarray,                           #  ← NEW
+        bar_id_map,                                     # numba.typed.Dict[int, int]
+        global_agg_values                               # np.ndarray of bar_dtype
+):
     """
-    Reads data from local CSV dump or from remote, in chunks, and aggregates to bar level.
-    By default, uses chunksize=200,000 for demonstration.
+    Aggregate one chunk of trades into 1‑minute or 1‑day bars,
+    resolving ties (same millisecond) with `trade_id`.
     """
+    for i in range(bar_ids.shape[0]):
+        bar_id   = bar_ids[i]
+        price    = prices[i]
+        qty      = qtys[i]
+        quote_qty = quote_qtys[i]
+        ts       = times[i]
+        is_buyer = is_buyer_maker[i]
+        tid      = trade_ids[i]                         #  ← NEW
+
+        if bar_id not in bar_id_map:
+            idx = len(bar_id_map)
+            bar_id_map[bar_id] = idx
+
+            # grow array if needed
+            if idx >= global_agg_values.shape[0]:
+                new_size = global_agg_values.shape[0] * 2
+                tmp = np.zeros(new_size, dtype=global_agg_values.dtype)
+                tmp[:global_agg_values.shape[0]] = global_agg_values
+                global_agg_values = tmp
+
+            g = global_agg_values[idx]
+            g.open  = g.close = g.high = g.low = price
+            g.volume = qty
+            g.total_quote_volume = quote_qty
+            g.sum_price_qty = price * qty
+            g.sum_buyer_maker = qty * is_buyer
+            g.sum_buyer_maker_price_qty = price * qty * is_buyer
+            g.first_trade_time = g.last_trade_time = ts
+            g.first_trade_id   = g.last_trade_id   = tid       #  ← NEW
+            global_agg_values[idx] = g
+        else:
+            idx = bar_id_map[bar_id]
+            g = global_agg_values[idx]
+
+            # ----- High / Low (order‑independent) -------------------------
+            if price > g.high: g.high = price
+            if price < g.low:  g.low  = price
+
+            # ----- Open (earliest)  --------------------------------------
+            if (ts < g.first_trade_time or
+               (ts == g.first_trade_time and tid < g.first_trade_id)):   #  ← NEW tie‑breaker
+                g.open = price
+                g.first_trade_time = ts
+                g.first_trade_id   = tid
+
+            # ----- Close (latest)  ---------------------------------------
+            if (ts > g.last_trade_time or
+               (ts == g.last_trade_time  and tid > g.last_trade_id)):     #  ← NEW tie‑breaker
+                g.close = price
+                g.last_trade_time = ts
+                g.last_trade_id   = tid
+
+            # ----- Additive metrics --------------------------------------
+            g.volume              += qty
+            g.total_quote_volume  += quote_qty
+            g.sum_price_qty       += price * qty
+            g.sum_buyer_maker     += qty * is_buyer
+            g.sum_buyer_maker_price_qty += price * qty * is_buyer
+
+            global_agg_values[idx] = g
+
+    return bar_id_map, global_agg_values
+
+
+
+def get_bars_by_date_optimized(url, file_root, bars_frequency,
+                               api_source: str, logger=None, chunksize=1_000_000,
+                               max_retries: int = 3, timeout_seconds: int = 600
+                               ):
     if logger is None:
         logger = FakeLogger()
+    from mainsequence.client import MARKETS_CONSTANTS as CONSTANTS # Local import to avoid circular dependency
+
 
     FUTURES_COLUMNS = ["trade_id", "price", "qty", "quoteQty", "time", "isBuyerMaker"]
     SPOT_COLUMNS = ["trade_id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"]
 
-
-
-    logger.info(f"building ...{url}")
+    logger.info(f"Building (optimized)... {url}")
     start_time = time.time()
 
-    # Instead of reading the entire CSV into memory, we will read in chunks.
-    # We'll store partial aggregator in a dictionary keyed by bar_id
-    global_agg = {}
+    # --- Robust Network Fetching with Retries and Timeout ---
+    response = None
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, timeout=timeout_seconds, stream=True)
+            response.raise_for_status()
+            break
+        except RequestException as e:
+            logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {url}: {e}")
+            if attempt + 1 == max_retries:
+                raise Exception(f"All retries failed for {url}. Aborting.")
+            time.sleep(2 ** attempt)
+
+    if response is None:
+        raise Exception
+
+    # Numba works best with typed dictionaries
+    bar_id_map = numba.typed.Dict.empty(
+        key_type=numba.types.int64,
+        value_type=numba.types.int64,
+    )
+    # Pre-allocate a large array for the aggregates. We'll resize later.
+
+    initial_size = 40000  # A full month of 1-min bars is ~43200
+    global_agg_values = np.zeros(initial_size, dtype=bar_agg_type.dtype)
 
     try:
-        # 1.1) If we have a local copy, read it chunk by chunk
+        zip_in_memory = io.BytesIO()
+        for chunk_data in response.iter_content(chunk_size=8192):
+            zip_in_memory.write(chunk_data)
+        zip_in_memory.seek(0)
 
+        with ZipFile(zip_in_memory) as zipfile_obj:
+            csv_filename = file_root + ".csv"
+            if csv_filename not in zipfile_obj.namelist():
+                logger.error(f"CSV '{csv_filename}' not found in zip from {url}")
+                return pd.DataFrame()
 
-
-        # 1.2) If there's no local CSV, fetch from remote, decompress, read in chunks
-        tries = 0
-        MAX_TRIES, SECONDS_WAIT = 3, .5
-        while True:
-            try:
-                resp = urlopen(url)
-                break
-            except HTTPError as e:
-                if e.code == 404:
-                    raise e
-                tries += 1
-                print(f"Try number {tries}, backoff {SECONDS_WAIT} seconds: {e}")
-                time.sleep(SECONDS_WAIT)
-                if tries >= MAX_TRIES:
-                    raise e
-
-        with ZipFile(BytesIO(resp.read())) as zipfile:
-            with zipfile.open(file_root + ".csv") as foofile:
-                # We read from the in-memory file object in chunks
-                for chunk in tqdm(pd.read_csv(foofile, header=None, low_memory=False, chunksize=chunksize),desc="reading chunks"):
-                    # Same transformations as above
-                    if api_source in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
+            with zipfile_obj.open(csv_filename) as csv_file:
+                for chunk in tqdm(pd.read_csv(csv_file, header=None, low_memory=False, chunksize=chunksize),
+                                  desc="Aggregating chunks", leave=False):
+                    if api_source == CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO:
                         chunk.columns = SPOT_COLUMNS
-                        chunk.drop(columns=["trade_id", "isBestMatch"], inplace=True)
-                    elif api_source == CONSTANTS.ASSET_TYPE_CRYPTO_USDM:
-                        chunk.columns = FUTURES_COLUMNS
-                        chunk.drop(columns=["trade_id"], inplace=True)
+                        chunk.drop(columns=["isBestMatch"], inplace=True)
                     else:
-                        raise NotImplementedError
+                        chunk.columns = FUTURES_COLUMNS
 
-                    if isinstance(chunk.iloc[0, 0], str):
-                        if not chunk.iloc[0, 0].isdigit():
-                            chunk = chunk.iloc[1:].copy()
+                    # --- More Robust Data Cleaning - working with integers directly ---
+                    # Handle potential header rows by coercing time column to numeric
+                    chunk['time'] = pd.to_numeric(chunk['time'], errors='coerce')
+                    chunk["trade_id"] = pd.to_numeric(chunk["trade_id"], errors="coerce").astype(np.int64)
 
-                    for col in chunk.columns:
-                        if col in ["price", "qty", "quoteQty"]:
-                            chunk[col] = chunk[col].astype("float32", errors='ignore')
-                    chunk["time"] = chunk["time"].astype(int, errors='ignore')
-                    if chunk["isBuyerMaker"].dtype == 'object':
-                        chunk["isBuyerMaker"] = chunk["isBuyerMaker"].astype(bool)
-                    chunk["isBuyerMaker"] = chunk["isBuyerMaker"].astype(int)
-
-                    chunk['time'] = pd.to_datetime(chunk['time'], unit='ms', errors='coerce')
                     chunk.dropna(subset=['time'], inplace=True)
-                    chunk.sort_values('time', inplace=True)
+                    if chunk.empty: continue
+
+                    # Ensure all relevant columns are numeric, coercing errors
+                    for col in ["price", "qty", "quoteQty"]:
+                        chunk[col] = pd.to_numeric(chunk[col], errors='coerce')
+
+                    if chunk["isBuyerMaker"].dtype == 'object':
+                        chunk["isBuyerMaker"] = pd.to_numeric(chunk["isBuyerMaker"], errors='coerce')
+
+                    # Drop any rows where key data might be missing after coercion
+                    chunk.dropna(subset=["price", "qty", "quoteQty", "isBuyerMaker"], inplace=True)
+                    if chunk.empty: continue
+
+                    times_arr, prices_arr, qtys_arr, quote_qtys_arr,is_buyer_maker_arr = (
+                        chunk["time"].to_numpy(dtype=np.int64),
+                        chunk["price"].to_numpy(dtype=np.float64),
+                        chunk["qty"].to_numpy(dtype=np.float64),
+                        chunk["quoteQty"].to_numpy(dtype=np.float64),
+                        chunk["isBuyerMaker"].to_numpy(dtype=np.int64)
+
+                    )
+                    trade_ids_arr = chunk["trade_id"].to_numpy(dtype=np.int64)  # ← NEW
 
                     if bars_frequency == "1m":
-                        chunk["bar_id"] = chunk["time"].dt.floor("min")
-                    elif bars_frequency in ["1days", "1d"]:
-                        chunk["bar_id"] = chunk["time"].dt.floor("D")
+                        bar_ids = (times_arr // 60000) * 60000
+                    elif bars_frequency in ["1d", "1day"]:
+                        bar_ids = (times_arr // 86400000) * 86400000
                     else:
                         raise NotImplementedError(f"{bars_frequency} not supported")
 
-                    chunk['price_qty'] = chunk['price'] * chunk['qty']
-                    chunk['buyer_maker_price_qty'] = chunk['price'] * chunk['qty'] * chunk['isBuyerMaker']
-                    chunk['qty_maker'] = chunk['qty'] * chunk['isBuyerMaker']
+                    bar_id_map, global_agg_values = aggregate_trades_chunk(
+                        bar_ids, prices_arr, qtys_arr, quote_qtys_arr, times_arr, is_buyer_maker_arr,
+                        trade_ids_arr,
+                        bar_id_map, global_agg_values
+                    )
+    except Exception as e:
+        logger.exception(f"Failed to process zip file from {url}: {e}")
+        return pd.DataFrame()
 
-                    partial_agg = chunk.groupby('bar_id').agg(
-                        open=('price', 'first'),
-                        close=('price', 'last'),
-                        high=('price', 'max'),
-                        low=('price', 'min'),
-                        volume=('qty', 'sum'),
-                        total_quote_volume=('quoteQty', 'sum'),
-                        sum_price_qty=('price_qty', 'sum'),
-                        sum_buyer_maker_price_qty=('buyer_maker_price_qty', 'sum'),
-                        sum_buyer_maker=('qty_maker', 'sum'),
-                        first_trade_time=('time', 'min'),
-                        last_trade_time=('time', 'max'),
+    if not bar_id_map: return pd.DataFrame()
+
+    # --- Final DataFrame Construction ---
+    final_size = len(bar_id_map)
+    ohlc = pd.DataFrame(global_agg_values[:final_size])
+    ohlc['bar_id_start'] = list(bar_id_map.keys())
+
+    ohlc['vwap'] = ohlc['sum_price_qty'] / ohlc['volume']
+    ohlc.drop(columns=['sum_price_qty'], inplace=True)
+
+    # The 'open_time' of the bar is its floored start time.
+    ohlc['open_time'] = ohlc['bar_id_start']#pd.to_datetime(ohlc['bar_id_start'], unit='ms', utc=True)
+    ohlc['first_trade_time'] =ohlc['first_trade_time']# pd.to_datetime(ohlc['first_trade_time'], unit='ms', utc=True)
+    ohlc['last_trade_time'] = ohlc['last_trade_time']# pd.to_datetime(ohlc['last_trade_time'], unit='ms', utc=True)
+
+    # Calculate frequency in seconds to get the bar's closing timestamp
+    if bars_frequency == "1m":
+        frequency_to_seconds = 60
+    elif bars_frequency in ["1d", "1day"]:
+        frequency_to_seconds = 86400
+    else:
+        raise NotImplementedError(f"Cannot determine frequency in seconds for {bars_frequency}")
+
+    # The final bar timestamp (the index) is the bar's closing time.
+    ohlc['time_index'] = pd.to_datetime(ohlc['bar_id_start'], unit='ms', utc=True)+ pd.to_timedelta(frequency_to_seconds, unit='s')
+
+    ohlc.drop(columns=['bar_id_start'], inplace=True)
+    logger.info(f"--- Completed {url} in {time.time() - start_time:.2f}s ---")
+    return ohlc.set_index('time_index')
+
+
+# ==============================================================================
+# 4. NEW: High-Performance Aggregation for Information-Driven Bars
+# ==============================================================================
+
+
+information_bar_type = np.dtype([
+    ('open', np.float64), ('high', np.float64), ('low', np.float64), ('close', np.float64),
+    ('volume', np.float64), ('vwap', np.float64),
+    ('start_time', np.int64), ('end_time', np.int64),
+    ('imbalance_at_close', np.float64),
+])
+information_bar_type = from_dtype(information_bar_type)
+
+
+@numba.njit
+def aggregate_to_information_bars(
+        prices, qtys, times,
+        ema_alpha, warmup_bars, expected_vol_per_bar,
+        # State carried over from the previous chunk
+        initial_threshold, initial_imbalance,
+        current_bar_state,
+        warmup_imbalances_list, bars_completed_so_far,
+        # Tick Rule State
+        initial_last_price, initial_last_direction
+):
+    """
+    Builds information-driven bars using the tick rule to infer trade direction.
+    """
+    completed_bars = []
+
+    b_open, b_high, b_low, b_volume, b_sum_price_qty, b_start_time = current_bar_state
+    cumulative_imbalance = initial_imbalance
+    threshold = initial_threshold
+
+    # Initialize tick rule state for the current chunk
+    last_price = initial_last_price
+    last_direction = initial_last_direction
+
+    for i in range(len(prices)):
+        price, qty, time = prices[i], qtys[i], times[i]
+
+        if b_start_time == 0:
+            b_open, b_high, b_low, b_start_time = price, price, price, time
+
+        b_high, b_low = max(b_high, price), min(b_low, price)
+        b_volume += qty
+        b_sum_price_qty += price * qty
+
+        # --- Tick Rule Implementation ---
+        if price > last_price:
+            direction = 1  # Buy
+        elif price < last_price:
+            direction = -1  # Sell
+        else:
+            direction = last_direction  # Use previous direction
+
+        signed_volume = qty * direction
+        cumulative_imbalance += signed_volume
+
+        # Update state for the next trade
+        if direction != 0:
+            last_direction = direction
+        last_price = price
+
+        # --- Bar Trigger Logic ---
+        trigger = False
+        if threshold > 0:
+            if abs(cumulative_imbalance) >= threshold: trigger = True
+        else:
+            if b_volume >= expected_vol_per_bar: trigger = True
+
+        if trigger:
+            vwap = b_sum_price_qty / b_volume if b_volume > 0 else b_open
+            bar = (b_open, b_high, b_low, price, b_volume, vwap, b_start_time, time, cumulative_imbalance)
+            completed_bars.append(bar)
+            bars_completed_so_far += 1
+
+            if threshold == 0:
+                warmup_imbalances_list.append(abs(cumulative_imbalance))
+                if bars_completed_so_far >= warmup_bars:
+                    total_imbalance = 0.0
+                    for imb in warmup_imbalances_list: total_imbalance += imb
+                    threshold = total_imbalance / len(warmup_imbalances_list)
+            else:
+                threshold = (1 - ema_alpha) * threshold + ema_alpha * abs(cumulative_imbalance)
+
+            cumulative_imbalance = 0.0
+            b_open, b_high, b_low, b_start_time = 0.0, 0.0, 0.0, 0
+            b_volume, b_sum_price_qty = 0.0, 0.0
+
+    final_bar_state = (b_open, b_high, b_low, b_volume, b_sum_price_qty, b_start_time)
+    final_tick_rule_state = (last_price, last_direction)
+
+    return completed_bars, threshold, cumulative_imbalance, final_bar_state, warmup_imbalances_list, bars_completed_so_far, final_tick_rule_state
+
+
+# ==============================================================================
+# 5. NEW: Main Orchestrator for Information-Driven Bars
+# ==============================================================================
+
+def get_information_bars(
+        url: str, file_root: str, api_source: str,
+        # Control parameters
+        ema_alpha: float = 0.001, warmup_bars: int = 20,
+        warmup_lookahead_trades: int = 50000,
+        # Optional state from previous day
+        previous_day_state: dict = None,
+        # Standard parameters
+        chunksize: int = 1_000_000, max_retries: int = 3, timeout_seconds: int = 600
+) -> tuple[pd.DataFrame, dict]:
+    """
+    Orchestrates the creation of information-driven bars from a remote data file.
+
+    This function processes a single data file (e.g., a day or month of trades) and
+    builds bars based on trade imbalance, as described by López de Prado. It is
+    stateful, designed to be called sequentially on contiguous data blocks.
+
+    Args:
+        url (str): The URL to the remote zip file containing trade data.
+        file_root (str): The base name of the CSV file inside the zip (e.g., "BTCUSDT-trades-2022-01-01").
+        api_source (str): The source of the data, used to determine column names.
+        ema_alpha (float): The learning rate for the EMA that updates the imbalance threshold.
+                           A small value creates a stable, long-memory threshold.
+        warmup_bars (int): The number of initial bars to create using a fixed-volume
+                           approach before switching to the dynamic imbalance threshold.
+        warmup_lookahead_trades (int): The number of trades to read from the start of the
+                                       file to estimate the initial volume-per-bar for the
+                                       warm-up phase. This is only used if `previous_day_state` is None.
+        previous_day_state (dict, optional): A dictionary containing the final state from the
+                                             previous run. If provided, the warm-up phase is
+                                             skipped. Expected keys are 'last_threshold',
+                                             'last_imbalance', and 'incomplete_bar'.
+        chunksize (int): The number of rows to process in each chunk.
+        max_retries (int): The number of times to retry downloading the data file.
+        timeout_seconds (int): The timeout for the network request.
+
+    Returns:
+        tuple[pd.DataFrame, dict]:
+            - pd.DataFrame: A DataFrame of the completed information-driven bars, indexed by the bar's end time.
+            - dict: A dictionary containing the final state to be passed as `previous_day_state`
+                    to the next run. Includes the last learned threshold, the imbalance of the
+                    final incomplete bar, and the state of that incomplete bar.
+    """
+    from mainsequence.client import MARKETS_CONSTANTS as CONSTANTS
+
+    FUTURES_COLUMNS = ["trade_id", "price", "qty", "quoteQty", "time", "isBuyerMaker"]
+    SPOT_COLUMNS = ["trade_id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"]
+
+    logger.info(f"Building Information Bars from: {url}")
+
+    # --- Local File Caching ---
+    CACHE_DIR = ".cache/binance_data"
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    url_filename = url.split("/")[-1]
+    local_zip_path = os.path.join(CACHE_DIR, url_filename)
+
+    zip_content = None
+    if os.path.exists(local_zip_path):
+        logger.info(f"Loading from local cache: {local_zip_path}")
+        with open(local_zip_path, 'rb') as f:
+            zip_content = f.read()
+    else:
+        logger.info("File not in cache, downloading...")
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(url, timeout=timeout_seconds, stream=True)
+                response.raise_for_status()
+                zip_content = response.content
+                with open(local_zip_path, 'wb') as f:
+                    f.write(zip_content)
+                logger.info(f"Saved to cache: {local_zip_path}")
+                break
+            except RequestException as e:
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt + 1 == max_retries: return pd.DataFrame(), {}
+                time.sleep(2 ** attempt)
+
+    if zip_content is None: return pd.DataFrame(), {}
+
+    # --- Initialize State for Aggregation ---
+    all_completed_bars = []
+
+    if previous_day_state:
+        stateful_threshold = previous_day_state.get('last_threshold', 0.0)
+        stateful_imbalance = previous_day_state.get('last_imbalance', 0.0)
+        stateful_bar_state = previous_day_state.get('incomplete_bar', (0.0, 0.0, 0.0, 0.0, 0.0, 0))
+        stateful_tick_rule_state = previous_day_state.get('tick_rule_state', (0.0, 1)) # (price, direction)
+
+        stateful_warmup_imbalances = numba.typed.List.empty_list(numba.types.float64)
+        stateful_bars_completed = warmup_bars
+        expected_vol_per_bar = 0
+    else:
+        logger.info(f"No previous state. Using lookahead of {warmup_lookahead_trades} trades for warm-up.")
+        try:
+            with ZipFile(io.BytesIO(zip_content)) as z:
+                csv_filename = file_root + ".csv"
+                with z.open(csv_filename) as f:
+                    warmup_df = pd.read_csv(f, header=None, nrows=warmup_lookahead_trades)
+
+            warmup_df.columns = FUTURES_COLUMNS if api_source != CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO else SPOT_COLUMNS
+            warmup_df['time'] = pd.to_numeric(warmup_df['time'], errors='coerce')
+            warmup_df['qty'] = pd.to_numeric(warmup_df['qty'], errors='coerce')
+            warmup_df.dropna(subset=['time', 'qty'], inplace=True)
+
+            time_span_minutes = (warmup_df['time'].max() - warmup_df['time'].min()) / 60000
+            total_volume = warmup_df['qty'].sum()
+
+            if time_span_minutes > 0 and total_volume > 0:
+                avg_vol_per_minute = total_volume / time_span_minutes
+                expected_vol_per_bar = avg_vol_per_minute
+            else:
+                expected_vol_per_bar = warmup_df['qty'].mean() * 25
+
+            logger.info(f"Calculated warm-up volume per bar: {expected_vol_per_bar:.4f}")
+
+        except Exception as e:
+            logger.error(f"Failed during warm-up lookahead: {e}. Aborting.")
+            return pd.DataFrame(), {}
+
+        stateful_threshold = 0.0
+        stateful_imbalance = 0.0
+        stateful_bar_state = (0.0, 0.0, 0.0, 0.0, 0.0, 0)
+        stateful_tick_rule_state = (0.0, 1) # Start with a buy assumption
+
+        # CORRECTED: Initialize as a typed list for Numba, even when empty
+        stateful_warmup_imbalances = numba.typed.List.empty_list(numba.types.float64)
+        stateful_bars_completed = 0
+
+    try:
+        zip_in_memory = io.BytesIO(zip_content)
+        with ZipFile(zip_in_memory) as zipfile_obj:
+            csv_filename = file_root + ".csv"
+            with zipfile_obj.open(csv_filename) as csv_file:
+                for chunk in tqdm(pd.read_csv(csv_file, header=None, low_memory=False, chunksize=chunksize),
+                                  desc="Building Info Bars"):
+                    if api_source == CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO:
+                        chunk.columns = SPOT_COLUMNS
+                        chunk.drop(columns=["trade_id", "isBestMatch", "quoteQty"], inplace=True)
+                    else:
+                        chunk.columns = FUTURES_COLUMNS
+                        chunk.drop(columns=["trade_id", "quoteQty"], inplace=True)
+
+                    if not chunk.empty and isinstance(chunk.iloc[0, 0], str):
+                        if not chunk.iloc[0, 0].isdigit(): chunk = chunk.iloc[1:].copy()
+
+                    for col in ["price", "qty"]: chunk[col] = pd.to_numeric(chunk[col], errors='coerce')
+                    chunk["time"] = pd.to_numeric(chunk["time"], errors='coerce')
+                    if chunk["isBuyerMaker"].dtype == 'object': chunk["isBuyerMaker"] = chunk["isBuyerMaker"].astype(
+                        bool)
+
+                    chunk.dropna(inplace=True)
+                    chunk.sort_values('time', inplace=True)
+                    if chunk.empty: continue
+
+                    prices_arr, qtys_arr, times_arr, is_buyer_maker_arr = (
+                        chunk["price"].to_numpy(dtype=np.float64),
+                        chunk["qty"].to_numpy(dtype=np.float64),
+                        chunk["time"].to_numpy(dtype=np.int64),
+                        chunk["isBuyerMaker"].to_numpy(dtype=np.int64)
                     )
 
-                    merge_partial_agg(global_agg, partial_agg)
+                    completed_bars, new_thresh, new_imbalance, new_bar_state, new_warmup_list, new_bars_completed, new_tick_rule_state = aggregate_to_information_bars(
+                        prices_arr, qtys_arr, times_arr,
+                        ema_alpha, warmup_bars, expected_vol_per_bar,
+                        stateful_threshold, stateful_imbalance,
+                        stateful_bar_state,
+                        stateful_warmup_imbalances,
+                        stateful_bars_completed,
+                        *stateful_tick_rule_state
+                    )
+                    if completed_bars: all_completed_bars.extend(completed_bars)
+                    stateful_threshold = new_thresh
+                    stateful_imbalance = new_imbalance
+                    stateful_bar_state = new_bar_state
+                    stateful_warmup_imbalances = numba.typed.List(new_warmup_list)
+                    stateful_bars_completed = new_bars_completed
+                    stateful_tick_rule_state = new_tick_rule_state
 
-
-
-    except HTTPError:
-        logger.error(f"{url} Not found")
-        return pd.DataFrame()
     except Exception as e:
-        logger.exception(str(e))
-        raise e
+        logger.exception(f"Failed to process info bars for {url}: {e}")
+        return pd.DataFrame(), {}
 
-    # -- 2) Convert global_agg (dict) into a DataFrame
-    if not global_agg:
-        # If somehow empty, return empty DF
-        return pd.DataFrame()
+    # --- Final DataFrame and State Construction ---
+    final_state = {
+        'last_threshold': stateful_threshold,
+        'last_imbalance': stateful_imbalance,
+        'incomplete_bar': stateful_bar_state
+    }
 
-    ohlc = pd.DataFrame.from_dict(global_agg, orient='index')
-    ohlc.index.name = 'bar_id'
-    ohlc.sort_index(inplace=True)
+    if not all_completed_bars: return pd.DataFrame(), final_state
 
-    # -- 3) Compute final vwap columns
-    ohlc['vwap'] = ohlc['sum_price_qty'] / ohlc['volume']
-    ohlc['vwap_buyer_maker'] = (
-            ohlc['sum_buyer_maker_price_qty'] / ohlc['sum_buyer_maker']
-    ).fillna(0)
-
-    # -- 4) Drop helper columns
-    ohlc.drop(
-        ['sum_price_qty', 'sum_buyer_maker_price_qty', 'sum_buyer_maker'],
-        axis=1,
-        inplace=True
-    )
-
-    # -- 5) Shift bar_id by frequency_to_seconds if needed
-    ohlc = ohlc.reset_index(drop=False)
-    ohlc["open_time"] = ohlc["bar_id"]
-    ohlc["bar_id"] = ohlc["bar_id"] + datetime.timedelta(seconds=frequency_to_seconds)
-
-    logger.info(f"--- {url} Completed in {time.time() - start_time:.2f} seconds ---")
-    return ohlc
-                
-            
-
-
-
-
+    df = pd.DataFrame(all_completed_bars, columns=[
+        'open', 'high', 'low', 'close', 'volume', 'vwap', 'start_time', 'end_time', 'imbalance_at_close'
+    ])
+    df['end_time'] = pd.to_datetime(df['end_time'], unit='ms', utc=True)
+    df=df.rename(columns={"start_time":"open_time","end_time":"time_index"})
+    return df.set_index('time_index'), final_state

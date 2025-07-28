@@ -6,6 +6,10 @@ import datetime
 import ccxt.pro
 import logging
 from abc import ABC, abstractmethod
+from mainsequence.tdag import TimeSerie
+
+
+
 
 class ProducerBase(ABC):
     """Abstract base class for all data producers."""
