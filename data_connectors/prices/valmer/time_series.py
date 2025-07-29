@@ -5,7 +5,7 @@ from typing import Union
 import pandas as pd
 
 from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.client import Asset, DataUpdates
+from mainsequence.client import Asset, UpdateStatistics
 from mainsequence.client.models_helpers import MarketsTimeSeriesDetails, DataFrequency
 from mainsequence.client.utils import DoesNotExist
 
@@ -28,6 +28,8 @@ class ImportValmer(TimeSerie):
         self.artifact_data = None
         super().__init__(*args, **kwargs)
 
+    def dependencies(self):
+        return {}
 
     def _get_artifact_data(self):
         if self.artifact_data is None:
@@ -91,7 +93,7 @@ class ImportValmer(TimeSerie):
                             ]
         return columns_metadata
 
-    def update(self, update_statistics: "DataUpdates"):
+    def update(self, update_statistics: "UpdateStatistics"):
         source_data = self.source_data
 
         assert source_data is not None, "Source data is not available"

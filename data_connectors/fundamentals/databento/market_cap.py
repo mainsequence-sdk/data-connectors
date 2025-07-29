@@ -6,7 +6,7 @@ import databento as db
 import pandas as pd
 import pytz
 from mainsequence.client import (
-    DataUpdates, Asset, MarketsTimeSeriesDetails, DataFrequency,
+    UpdateStatistics, Asset, MarketsTimeSeriesDetails, DataFrequency,
     AssetTranslationRule, AssetFilter, MARKETS_CONSTANTS
 )
 from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
@@ -55,13 +55,16 @@ class DatabentoMarketCap(TimeSerie):
         except Exception as e:
             self.logger.error(f"Could not instantiate APITimeSerie for prices using identifier '{self.prices_time_serie_unique_identifier}': {e}")
 
-    def _get_asset_list(self) -> List[Asset]:
+    def dependencies(self):
+        return {}
+
+    def get_asset_list(self) -> List[Asset]:
         if self.asset_list is None:
             self.logger.info(f"{self.local_hash_id} is using default stock assets.")
             self.asset_list = get_stock_assets()
         return self.asset_list
 
-    def update(self, update_statistics: "DataUpdates"):
+    def update(self, update_statistics: "UpdateStatistics"):
         """
         Calculates market cap on a per-asset basis. For each asset, it fetches new price data
         and then queries for shares outstanding only over the time period for which new prices were found.
@@ -143,7 +146,7 @@ class DatabentoMarketCap(TimeSerie):
 
         return final_df
 
-    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: "DataUpdates"):
+    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: "UpdateStatistics"):
         if error_on_last_update:
             self.logger.warning("Do not register data source due to error during run")
             return
@@ -167,7 +170,7 @@ class DatabentoMarketCap(TimeSerie):
                 AssetTranslationRule(
                     asset_filter=AssetFilter(
                         execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type="Common Stock",
+                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
                     ),
                     markets_time_serie_unique_identifier=markets_time_series_identifier,
                     target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,

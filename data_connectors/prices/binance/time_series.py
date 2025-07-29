@@ -1,5 +1,7 @@
 from mainsequence.tdag.time_series import TimeSerie
-from .utils import  get_bars_by_date, set_ohlc,fetch_binance_bars_for_single_day
+from .utils import (   get_bars_by_date_optimized,
+                    get_information_bars
+                    )
 from ..utils import transform_frequency_to_seconds
 
 from joblib import delayed, Parallel
@@ -9,552 +11,625 @@ import numpy as npA
 import pandas as pd
 import datetime
 import pytz
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Dict, Any, Tuple
 import requests
-import calendar
-import json
+import time
 
 from mainsequence.client import (MARKETS_CONSTANTS,
                                  DoesNotExist, Asset, AssetCurrencyPair, AssetFutureUSDM, DataFrequency,
                                 AssetCategory
                                  )
+from abc import ABC, abstractmethod
+
+import mainsequence.client as ms_client
 import copy
 import logging
+from pydantic import BaseModel
+from ...utils import has_sufficient_memory
+import dataclasses
+import functools
+import zipfile
+import io
 
-from ...utils import has_sufficient_memory, NAME_CRYPTO_MARKET_CAP_TOP100, register_mts_in_backed, \
-    NAME_CRYPTO_MARKET_CAP_TOP50, NAME_CRYPTO_MARKET_CAP_TOP10
-from .utils import fetch_futures_symbols_dict, fetch_spot_symbols_dict
 
 # Binance API credentials
 BINANCE_API_KEY = os.environ.get('BINANCE_API_KEY', None)
 BINANCE_API_SECRET = os.environ.get('BINANCE_API_SECRET', None)
 
-def get_date_format(date: datetime.datetime) -> str:
-    return date.strftime("%d %b, %Y")
+
+@functools.lru_cache(maxsize=None)
+def fetch_spot_symbols_dict():
+    """
+    Fetches the entire spot exchangeInfo once and returns a dict:
+        {symbol_name: status, ...}
+    """
+    url = "https://api.binance.com/api/v3/exchangeInfo"
+    resp = requests.get(url)
+    resp.raise_for_status()  # raise an HTTPError if bad status
+    data = resp.json()
+
+    # Build a lookup dict of symbol -> status
+    return {s["symbol"]: s["status"] for s in data.get("symbols", [])}
+
+@functools.lru_cache(maxsize=None)
+def fetch_futures_symbols_dict():
+    """
+    Fetches the entire USDM futures exchangeInfo once and returns a dict:
+        {symbol_name: status, ...}
+    """
+    url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
+    resp = requests.get(url)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Build a lookup dict of symbol -> status
+    return {s["symbol"]: s["status"] for s in data.get("symbols", [])}
+
+def timestamp_to_utc_datetime(x):
+    return datetime.datetime.utcfromtimestamp(x * 1e-3).replace(tzinfo=pytz.utc)
+
+def binance_time_stamp_to_datetime(series:pd.Series)->pd.Series:
+    return series.apply(lambda x: datetime.datetime.utcfromtimestamp(x * 1e-3))
 
 class NoDataInURL(Exception):
     pass
 
-SPOT_API_URL = "https://api.binance.com"  # Spot endpoint
-FUTURES_API_URL = "https://fapi.binance.com"  # Futures USD-M endpoint
-# Root URLs for Binance data
-SPOT_DAY_ROOT_URL = "https://data.binance.vision/data/spot/daily/trades/"
-SPOT_MONTH_ROOT_URL = "https://data.binance.vision/data/spot/monthly/trades/"
-FUTURES_USDM_DAY_ROOT_URL = "https://data.binance.vision/data/futures/um/daily/trades/"
-FUTURES_USDM_MONTH_ROOT_URL = "https://data.binance.vision/data/futures/um/monthly/trades/"
+class BarConfiguration(BaseModel):
+    """Abstract base class for bar construction configurations."""
+    pass
 
-EV_FRE_URL_MAP =  {
-            "daily": {
-                MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO: SPOT_DAY_ROOT_URL,
-                MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE: FUTURES_USDM_DAY_ROOT_URL
-            },
-            "monthly": {
-                MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO: SPOT_MONTH_ROOT_URL,
-                MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE: FUTURES_USDM_MONTH_ROOT_URL
-            }
-        }
+class TimeBarConfig(BarConfiguration):
+    """Configuration for standard time-aggregated bars."""
+    frequency_id: str
+
+class ImbalanceBarConfig(BarConfiguration):
+    """
+    Configuration for information-driven bars based on the tick rule.
+    """
+    ema_alpha: float = 0.001
+    warmup_bars: int = 20
+    warmup_lookahead_trades: int = 50000
+
+
+@dataclasses.dataclass
+class BinanceConfig:
+    """Holds all configuration for Binance data sources."""
+    SPOT_API_URL: str = "https://api.binance.com"
+    FUTURES_API_URL: str = "https://fapi.binance.com"
+    SPOT_DAY_ROOT_URL: str = "https://data.binance.vision/data/spot/daily/trades/"
+    SPOT_MONTH_ROOT_URL: str = "https://data.binance.vision/data/spot/monthly/trades/"
+    FUTURES_USDM_DAY_ROOT_URL: str = "https://data.binance.vision/data/futures/um/daily/trades/"
+    FUTURES_USDM_MONTH_ROOT_URL: str = "https://data.binance.vision/data/futures/um/monthly/trades/"
+    MEMORY_THRESHOLD: float = 0.6
+
+CONFIG = BinanceConfig()
+
 
 logger = logging.getLogger(__name__)
 
-def get_url( is_daily: bool, api_source: str) -> str:
-    return EV_FRE_URL_MAP["daily"][api_source] if is_daily else EV_FRE_URL_MAP["monthly"][api_source]
+class NoDataInURL(Exception):
+    pass
 
-def get_file_root(binance_symbol: str, date: datetime.datetime, is_daily: bool) -> str:
-    date_str = date.strftime("%Y-%m-%d") if is_daily else date.strftime("%Y-%m")
-    return f"{binance_symbol}-trades-{date_str}"
+class BaseBinanceEndpoint(TimeSerie):
+    """Base class for fetching historical data from Binance."""
+    OFFSET_START = datetime.datetime(2017, 1, 1, tzinfo=pytz.utc)
 
-def get_target_url_by_day(date, is_daily, api_source, binance_symbol):
-    root = get_url(is_daily=is_daily, api_source=api_source)
-    return root + binance_symbol + "/" + get_file_root(binance_symbol,date, is_daily) + ".zip"
-
-def _parallel_bar_update(info_map, frequency_to_seconds, frequency_id,
-                         is_daily, time_range, latest_value,
-                         unique_identifier:str,bars_source):
-    global logger
-    api_source = info_map[unique_identifier]["api_source"]
-    binance_symbol = info_map[unique_identifier]["binance_symbol"]
-
-    if bars_source == "binance_bars":
-
-        all_dfs = [fetch_binance_bars_for_single_day(
-            market_type=api_source,
-            is_daily=is_daily,
-            symbol=binance_symbol,
-            interval=frequency_id,
-            single_day=day,
-
-            ) for day in tqdm(time_range,desc=f"{unique_identifier}: {time_range[0]}-{time_range[-1]}")]
-    elif bars_source == "binance_trades":
-        all_dfs = [get_bars_by_date(
-            url=get_target_url_by_day(date=day, is_daily=is_daily, api_source=api_source,
-                                      binance_symbol=binance_symbol),
-            file_root=get_file_root(date=day, is_daily=is_daily, binance_symbol=binance_symbol),
-            api_source=api_source,
-            frequency_to_seconds=frequency_to_seconds,
-            bars_frequency=frequency_id
-        ) for day in tqdm(time_range,desc=f"{unique_identifier}: {time_range[0]}-{time_range[-1]}")]
-    else:
-        raise NotImplementedError
-    try:
-        all_dfs = pd.concat(all_dfs, axis=0, ignore_index=True)
-    except Exception as e:
-        raise e
-
-    if len(all_dfs) == 0:
-        return pd.DataFrame()
-
-    if  bars_source == "binance_trades":
-        raise Exception("next minute forward not implemented")
-        all_dfs = set_ohlc(ohlc_df=all_dfs)
-        if all_dfs.shape[0] == 0:
-            logger.warning(f"{unique_identifier} No more data after {time_range[0]}")
-    else:
-        all_dfs["close_time"]=all_dfs["close_time"].dt.floor(freq="1min")+datetime.timedelta(seconds=60)
-        all_dfs = all_dfs.set_index("close_time")
-
-    return all_dfs
-
-def _process_symbol_update(
-    unique_identifier,
-    start_date_for_update,
-    is_daily,
-    last_date_available,
-    LAST_AVAILABLE_DAYS,
-    bars_source: str,
-    logger_context: str,
-    info_map: dict,
-    frequency_to_seconds: int,
-    frequency_id: str,
-    batch_update_days: int,
-):
-    global logger
-    """Process one (symbol, execution_venue_symbol) pair and return bars DataFrame."""
-
-    if not has_sufficient_memory(0.6):
-        logger.warning(f"Memory usage too high, stopping the update for {unique_identifier}.")
-        return pd.DataFrame()
-
-    update_prices = False
-
-    if (datetime.datetime.now(tz=pytz.utc).date() - start_date_for_update).days > LAST_AVAILABLE_DAYS:
-        update_prices = True
-        assert LAST_AVAILABLE_DAYS >= 1
-
-    all_dfs = pd.DataFrame()
-    if update_prices:
-        freq = "1d" if is_daily else "1ME"  # or "1ME" if not is_daily else "1d"
-        last_date_available_monthly = last_date_available
-        date_seq = calendar._nextmonth(last_date_available_monthly.year, last_date_available_monthly.month)
-        date_seq = datetime.date(date_seq[0], date_seq[1], 1)
-        decrease_td= datetime.timedelta(days=LAST_AVAILABLE_DAYS) if is_daily else datetime.timedelta(days=0)
-        date_seq = min(
-            last_date_available -
-            decrease_td,
-            date_seq
-        )
-        time_range = pd.date_range(start_date_for_update, date_seq, freq=freq)
-
-        if len(time_range) > 0:
-            try:
-                all_dfs = _parallel_bar_update(
-                    time_range=time_range,
-                    is_daily=is_daily,
-                    latest_value=start_date_for_update,
-                    unique_identifier=unique_identifier,
-                    info_map=info_map,
-                    frequency_to_seconds=frequency_to_seconds,
-                    frequency_id=frequency_id,
-                    bars_source=bars_source
-                )
-                last_update = all_dfs.index.max()
-            except NoDataInURL:
-                logger.exception(f"Not updating {unique_identifier} due to URL not found")
-                return pd.DataFrame()
-
-        # If we used monthly freq, but there's still daily data available that extends beyond last_update
-        if freq == "1m" \
-           and (last_update.date() < last_date_available) \
-           and (last_date_available > last_date_available_monthly):
-            logger.debug("Concatenating daily request")
-            daily_time_range = pd.date_range(last_update.date(), last_date_available, freq="1d")
-            daily_time_range = [c for c in daily_time_range if c < datetime.datetime.utcnow()]
-            daily_dfs = _parallel_bar_update(
-                time_range=daily_time_range,
-                is_daily=True,    # daily
-                unique_identifier=unique_identifier,
-                latest_value=last_update
-            )
-            all_dfs = pd.concat([all_dfs, daily_dfs], axis=0)
-
-        if all_dfs.shape[0] == 0:
-            return pd.DataFrame()
-
-        # Localize datetime columns
-        for col in ["first_trade_time", "last_trade_time", "open_time"]:
-            if col in all_dfs.columns:
-                if all_dfs.dtypes[col] !="int64":
-                    all_dfs[col] = all_dfs[col].dt.tz_localize(pytz.utc).astype(np.int64)
-
-        # Deduplicate
-        all_dfs = all_dfs[~all_dfs.index.duplicated(keep='last')]
-
-        # Reindex into multi-index
-        all_dfs = pd.concat([all_dfs], axis=0, keys=[unique_identifier])
-        all_dfs.index.names = [ "unique_identifier", "time_index"]
-        all_dfs = all_dfs.reorder_levels(["time_index", "unique_identifier"])
-
-    return all_dfs
-
-
-class BaseBinanceEndpoint:
     def __init__(
             self,
-            asset_list: Optional[List],
-            frequency_id: str,
-            local_kwargs_to_ignore: List[str] = ["asset_list"],
+            asset_list: Optional[List[Asset]],
+            bar_configuration: BarConfiguration,
+            local_kwargs_to_ignore: List[str] = ["asset_list","asset_category_identifier"],
+            asset_category_identifier: Optional[str] = None,
+
             *args,
             **kwargs
     ):
-        """
-        Args:
-            asset_list (List): List of assets.
-            frequency_id (str): ID of frequency (e.g., '1min').
-            back_fill_futures_with_spot (bool): If True, futures are back-filled with spot prices.
-            spot_pair (Union[str, None], optional): The spot pair. Defaults to None.
-            *args: Additional arguments.
-            **kwargs: Additional keyword arguments.
-        """
         super().__init__(*args, **kwargs)
 
-        if frequency_id not in {freq.value for freq in DataFrequency}:
-            raise AssertionError(f"Invalid frequency_id: {frequency_id}")
+
 
         self.asset_list = asset_list
-        self.frequency_id = frequency_id
-        self.frequency_to_seconds = transform_frequency_to_seconds(frequency_id=self.frequency_id)
-        self.use_vam_assets = False
-        if self.asset_list is None:
-            self.use_vam_assets = True
-        self.info_map=None
+        if asset_category_identifier is not None:
+            assert self.asset_list is None, "asset list should be empty if using an asset category identifier"
+        self.asset_category_identifier=asset_category_identifier
+        self.bar_configuration = bar_configuration
+        self.info_map: Dict[str, dict] = {}
+
         if self.asset_list is not None:
             self._init_info_map(self.asset_list)
 
-    def _init_info_map(self,asset_list:list[Asset]):
+    def dependencies(self) -> Dict:
+        return {}
+
+    def _init_info_map(self, asset_list: list[Asset]):
+        """
+        Creates a mapping from unique_identifier to Binance-specific info.
+        This is the CORRECT implementation provided by the user.
+        """
         from mainsequence.client import MARKETS_CONSTANTS as CONSTANTS
 
         info_map = {}
         for asset in asset_list:
-            binance_symbol = (
-                asset.currency_pair.ticker if asset.security_type == CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE
-                else
-                f"{asset.base_asset.ticker}{asset.quote_asset.ticker}"
+            # Correctly determine the symbol based on security type
+            if asset.security_type == CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
+                binance_symbol = asset.currency_pair.ticker
+                assert asset.maturity_code == "PERPETUAL"
+            else:  # Assumes spot otherwise
+                binance_symbol = f"{asset.base_asset.ticker}{asset.quote_asset.ticker}"
 
-            )
             info_map[asset.unique_identifier] = {
                 "binance_symbol": binance_symbol,
                 "execution_venue_symbol": asset.execution_venue.symbol,
-                "api_source": asset.security_type
+                "api_source": asset.security_type  # Store the specific security type
             }
-            if asset.security_type == CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
-                assert asset.maturity_code == "PERPETUAL"
-
         self.info_map = info_map
 
+    def get_asset_list(self):
+        if self.asset_list is None:
 
-    def _override_end_value(
-        self,
-        start_date: datetime.datetime,
-        last_date_available: datetime.datetime,
-        unique_identifier: str
-    ):
-        override_end = None
-        if (datetime.datetime.now(pytz.utc).date() - start_date).days > self.BATCH_UPDATE_DAYS:
-            override_end = min(start_date + datetime.timedelta(days=self.BATCH_UPDATE_DAYS), last_date_available)
-        if override_end is not None:
-            self.logger.debug(f"Last possible update overridden for {unique_identifier} at {override_end}")
-        return override_end
+            # get them through main sequence figi class and exchange
+            target_category=ms_client.AssetCategory.get(unique_identifier=self.asset_category_identifier)
+            asset_list=ms_client.Asset.filter(id__in=target_category.assets)
+            # return binance_futures+binance_currency_pairs
+            self.logger.warning("Only using currency pair for now due to timeouts in updating - add futures later")
+            return asset_list
 
-    def transform_frequency_to_seconds(self):
-        return transform_frequency_to_seconds(frequency_id=self.frequency_id)
+        return self.asset_list
 
-    def _get_required_cores(self,asset_list):
-        if len(asset_list) > 5:
-            return 5 # higher number may lead to data base connection errors
-        return 1
+    def _get_url_and_root_for_day(self, symbol_info: dict, day: datetime.datetime) -> tuple[str, str]:
+        """Constructs the download URL and file root for a specific day's trades."""
+        is_daily = (datetime.datetime.now().date() - day.date()).days <= 33
+        api_source = symbol_info["api_source"]
+        binance_symbol = symbol_info["binance_symbol"]
 
-    def run_after_post_init_routines(self):
-        """
-        Use post init routines to configure the time series
-        """
-        if self.metadata is not None:
-            if not self.metadata.protect_from_deletion:
-                self.local_persist_manager.protect_from_deletion()
+        if api_source == MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
+            root_url = CONFIG.FUTURES_USDM_DAY_ROOT_URL if is_daily else CONFIG.FUTURES_USDM_MONTH_ROOT_URL
+        else:
+            root_url = CONFIG.SPOT_DAY_ROOT_URL if is_daily else CONFIG.SPOT_MONTH_ROOT_URL
 
-    def get_updated_bars(self, update_statistics, LAST_AVAILABLE_DAYS):
+        date_str = day.strftime("%Y-%m-%d") if is_daily else day.strftime("%Y-%m")
+        file_root = f"{binance_symbol}-trades-{date_str}"
+        url = f"{root_url}{binance_symbol}/{file_root}.zip"
+        return url, file_root
 
-        start_date_for_update_map = {}
-        initial_start = copy.deepcopy(update_statistics.update_statistics)
+    def update(self, update_statistics: ms_client.UpdateStatistics) -> pd.DataFrame:
+        """Main update orchestrator."""
+        if not self.info_map:
+            self._init_info_map(update_statistics.asset_list)
+
+
+
+        # 1. Get active assets and their historical start dates
+        active_uids, start_date_map = self._get_active_assets_and_start_dates(update_statistics)
+        if not active_uids:
+            logger.warning("No active assets found to update.")
+            return pd.DataFrame()
+
+        # 2. Calculate the required update range for each asset
+        update_ranges = self._calculate_update_ranges(update_statistics, start_date_map)
+
+        # 3. Fetch data in parallel
+        all_bars = self._run_parallel_fetch(update_ranges)
+        if all_bars.empty:
+            return pd.DataFrame()
+
+        return all_bars
+
+    def _get_active_assets_and_start_dates(self, update_statistics) -> Tuple[List[str], Dict[str, datetime.date]]:
+        """Filters for tradable assets and finds their inception date on Binance."""
 
         futures_status = fetch_futures_symbols_dict()
         spot_status = fetch_spot_symbols_dict()
 
-        combos_to_pop = []
-        for unique_identifier, symbol_config in tqdm(self.info_map.items(), desc="getting start dates"):
-            start_date_for_update_map[unique_identifier] = update_statistics[unique_identifier].date()
-            binance_symbol = symbol_config["binance_symbol"]
+        active_uids = []
+        start_date_map = {}
 
-            if symbol_config["api_source"] == MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
-                base_endpoint = f"{FUTURES_API_URL}/fapi/v1/klines"
-                is_futures = True
-            elif symbol_config["api_source"] == MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO:  # Default to spot
-                base_endpoint = f"{SPOT_API_URL}/api/v1/klines"
-                is_futures = False
-            else:
-                raise NotImplementedError
-
-            if start_date_for_update_map[unique_identifier] > self.OFFSET_START.date():
-                if binance_symbol not in futures_status and binance_symbol not in spot_status:
-                    combos_to_pop.append(unique_identifier)
-
-                if is_futures:
-                    if futures_status[binance_symbol] != "TRADING":
-                        combos_to_pop.append(unique_identifier)
-                else:
-                    if spot_status[binance_symbol] != "TRADING":
-                        combos_to_pop.append(unique_identifier)
+        for asset in tqdm(update_statistics.asset_list, desc="Checking asset status"):
+            uid = asset.unique_identifier
+            info = self.info_map.get(uid)
+            if not info:
                 continue
 
-            response = requests.get(f'{base_endpoint}?symbol={binance_symbol}&interval=1m&startTime=0')
-            if response.status_code != 200:
-                combos_to_pop.append(unique_identifier)
-                self.logger.warning(f"{unique_identifier} prices does not exist")
+            # Check trading status
+            is_future = info["api_source"] == MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE
+            status_dict = futures_status if is_future else spot_status
+            if status_dict.get(info["binance_symbol"]) != "TRADING":
+                logger.debug(f"Skipping {uid} ({info['binance_symbol']}) - not in TRADING status.")
                 continue
 
-            first_trade = pd.DataFrame(response.json())
-            start_date_for_update = datetime.datetime.utcfromtimestamp(
-                first_trade[0].sort_values().iloc[0] / 1000).date()
-            start_date_for_update_map[unique_identifier] = start_date_for_update
+            # Find first trade date from Binance API to avoid 404s on historical data
+            endpoint = CONFIG.FUTURES_API_URL if is_future else CONFIG.SPOT_API_URL
+            api_call="fapi" if is_future else "api"
+            url = f'{endpoint}/{api_call}/v1/klines?symbol={info["binance_symbol"]}&interval=1d&limit=1&startTime=0'
+            try:
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                first_trade_ms = response.json()[0][0]
+                start_date_map[uid] = datetime.datetime.fromtimestamp(first_trade_ms / 1000, tz=pytz.utc).date()
+                active_uids.append(uid)
+            except (requests.RequestException, IndexError) as e:
+                logger.warning(f"Could not get start date for {uid} ({info['binance_symbol']}): {e}")
 
-        for c in combos_to_pop:
-            self.info_map.pop(c)
-            start_date_for_update_map.pop(c)
-        last_date_available = (datetime.datetime.now() - datetime.timedelta(days=LAST_AVAILABLE_DAYS)).date()
+        return active_uids, start_date_map
 
-        override_end_value_map = {
-            unique_identifier: self._override_end_value(
-                start_date=start_date_for_update,
-                last_date_available=last_date_available,
-                unique_identifier=unique_identifier
-            )
-            for unique_identifier, start_date_for_update in start_date_for_update_map.items()
-        }
+    def _calculate_update_ranges(self, update_statistics, start_date_map) -> Dict:
+        """Determines the date range to fetch for each asset."""
+        update_ranges = {}
+        last_available_date = (
+                    datetime.datetime.now(pytz.utc) - datetime.timedelta(days=self.LAST_AVAILABLE_DAYS)).date()
 
-        last_date_available_map = {
-            s: min(_override_end_value, last_date_available) if _override_end_value is not None else last_date_available
-            for s, _override_end_value in override_end_value_map.items()
-        }
+        for uid, historical_start in start_date_map.items():
+            last_update = update_statistics.get_last_update_index_2d(uid).date()
+            start_date = max(historical_start, last_update)
 
-        is_daily_map = {
-            symbol_combo: (datetime.datetime.now().date() - start_date_for_update_map[symbol_combo]).days <= 33
-            for symbol_combo in start_date_for_update_map.keys()
-        }
+            # Apply batching limit to avoid huge downloads
+            end_date = min(start_date + datetime.timedelta(days=self.BATCH_UPDATE_DAYS), last_available_date)
 
-        extra_kwargs = dict(logger_context=self.logger._context,
-                            batch_update_days=self.BATCH_UPDATE_DAYS,
-                            frequency_id=self.frequency_id,
-                            frequency_to_seconds=self.frequency_to_seconds,
-                            info_map=self.info_map)
+            if end_date > start_date:
+                update_ranges[uid] = pd.date_range(start_date, end_date, freq='D')
 
-        n_jobs = self._get_required_cores(update_statistics.asset_list)
-        # n_jobs=1
-        # start_date_for_update_map={k:v for counter,(k,v) in enumerate(start_date_for_update_map.items()) if counter<1}
+        return update_ranges
 
-        all_symbol_bars = Parallel(n_jobs=n_jobs)(
-            delayed(_process_symbol_update)(
-                unique_identifier,
-                start_date_for_update,
-                is_daily_map[unique_identifier],
-                last_date_available_map[unique_identifier],
-                LAST_AVAILABLE_DAYS,
-                bars_source=self.bars_source,
-                **extra_kwargs
-            )
-            for unique_identifier, start_date_for_update in start_date_for_update_map.items()
-        )
-
-        # results is now a list of DataFrames; you can concat them
-        all_symbol_bars = pd.concat(all_symbol_bars, axis=0) if any(
-            not df.empty for df in all_symbol_bars) else pd.DataFrame()
-
-        if all_symbol_bars.shape[0] == 0:
+    def _run_parallel_fetch(self, update_ranges: Dict[str, pd.DatetimeIndex]) -> pd.DataFrame:
+        """Orchestrates fetching data in parallel using the defined fetcher strategy."""
+        if not update_ranges:
             return pd.DataFrame()
 
-        all_symbol_bars = update_statistics.filter_df_by_latest_value(all_symbol_bars)
-        return all_symbol_bars
+        # Simple memory check
+        if not has_sufficient_memory(CONFIG.MEMORY_THRESHOLD):
+            logger.warning("Memory usage too high, aborting parallel fetch.")
+            return pd.DataFrame()
 
+        n_jobs = min(os.cpu_count() or 1, 5)  # Limit jobs to avoid rate limits / DB issues
+        n_jobs=1
 
-    def _get_asset_list(self):
-        if self.asset_list is None:
-            # TODO make it work with more cryptos
-            top_10_crypto = AssetCategory.get(source="coingecko",
-                                               unique_identifier=NAME_CRYPTO_MARKET_CAP_TOP10.lower().replace(" ",
-                                                                                                               "_"), )
-            spot_assets = Asset.filter(id__in=top_10_crypto.assets)
-            # get them through main sequence figi class and exchange
-            binance_currency_pairs = AssetCurrencyPair.filter(
-                base_asset__main_sequence_share_class__in=[a.main_sequence_share_class for a
-                                                                         in spot_assets],
-                execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                quote_asset__ticker="USDT"
-                )
-
-            binance_futures = AssetFutureUSDM.filter(
-                execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_FUTURES_EV_SYMBOL,
-                currency_pair__ticker__in=[a.ticker for a in binance_currency_pairs] + ["1000" + a.ticker for a in
-                                                                                        binance_currency_pairs]
-
-            )
-
-            # return binance_futures+binance_currency_pairs
-            self.logger.warning("Only using currency pair for now due to timeouts in updating - add futures later")
-            return binance_currency_pairs
-
-        return self.asset_list
-
-    def update(self, update_statistics):
-        if self.info_map is None:
-            self._init_info_map(update_statistics.asset_list)
-
-        all_symbol_bars = self.get_updated_bars(
-            update_statistics=update_statistics,
-            LAST_AVAILABLE_DAYS=self.LAST_AVAILABLE_DAYS,
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(self._process_single_asset)(uid, date_range)
+            for uid, date_range in update_ranges.items()
         )
 
-        assert all_symbol_bars.index.duplicated().sum()==0
+        valid_results = [df for df in results if not df.empty]
+        return pd.concat(valid_results, axis=0) if valid_results else pd.DataFrame()
 
-        return all_symbol_bars
+    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex) -> pd.DataFrame:
+        """
+        To be implemented by subclasses. This is the core method that defines
+        how data for a single asset over a date range is fetched and processed.
+        """
+        raise NotImplementedError
 
-    def  _run_post_update_routines(self, error_on_last_update,update_statistics):
-        asset_id_list=[a.id for a in update_statistics.asset_list]
-        self.vam_bar_source.append_assets(asset_id_list=asset_id_list)
+    def run_post_update_routines(self, error_on_last_update: bool, update_statistics: ms_client.UpdateStatistics):
+        """Common post-update routines for all Binance TimeSeries."""
+        if self.metadata is None:
+            return
+        if not self.metadata.protect_from_deletion:
+            self.local_persist_manager.protect_from_deletion()
+        if error_on_last_update:
+            logger.warning("Not performing post-update tasks due to error during run.")
+            return
 
-class BinanceHistoricalBars(BaseBinanceEndpoint, TimeSerie):
+        # Append assets to a VAM or other registry if needed
+        # asset_id_list = [a.id for a in update_statistics.asset_list]
+        # self.vam_bar_source.append_assets(asset_id_list=asset_id_list)
+        logger.info(f"Post-update routines completed for {self.__class__.__name__}.")
+
+
+# ==============================================================================
+# 4. LEAN AND EXTENSIBLE TIMESERIE CLASSES
+# ==============================================================================
+
+class BinanceHistoricalBars(BaseBinanceEndpoint):
+    """
+    TimeSerie for fetching aggregated bars directly from the Binance API.
+    """
     BATCH_UPDATE_DAYS = 30 * 12 * 8
     LAST_AVAILABLE_DAYS = 1
-
     def __init__(
             self,
-            asset_list: List,
-            frequency_id: str,
-            local_kwargs_to_ignore: List[str] = ["asset_list"],
             *args,
             **kwargs
     ):
-        """
-        Args:
-            asset_list (List): List of assets.
-            frequency_id (str): ID of frequency (e.g., '1min').
-            back_fill_futures_with_spot (bool): If True, futures are back-filled with spot prices.
-            spot_pair (Union[str, None], optional): The spot pair. Defaults to None.
-            *args: Additional arguments.
-            **kwargs: Additional keyword arguments.
-        """
-        super().__init__(asset_list=asset_list,
-                         frequency_id=frequency_id,
-                         local_kwargs_to_ignore=local_kwargs_to_ignore, *args, **kwargs)
 
-        if self.frequency_id == "1m":
-            self.logger.warning("Use BarsFromTrades for 1m data.")
+        super().__init__(*args, **kwargs        )
 
-        self.bars_source = "binance_bars"
+        assert isinstance(self.bar_configuration,TimeBarConfig)
 
 
-    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
-        """
-
-        """
-        if self.use_vam_assets == True and self.frequency_id != "1m":
-            CANONICAL_FUNDAMENTALS_ID = f"binance_{self.frequency_id}_bars"
-
-            meta=ms_client.TableMetaData(  identifier=CANONICAL_FUNDAMENTALS_ID,
-                                           description=f"Binance {self.frequency_id} bars, does not include vwap",
-                                           data_frequency_id=self.frequency_id,
-                                                   )
-
-
-            return meta
+    def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
+        # Logic from original code for automatic VAM creation
+        is_dynamic = self.asset_list is None
+        if is_dynamic and self.frequency_id != "1m":
+            identifier = f"binance_{self.frequency_id}_bars"
+            return ms_client.TableMetaData(
+                identifier=identifier,
+                description=f"Binance {self.frequency_id} bars, does not include vwap",
+                data_frequency_id=DataFrequency(self.frequency_id),
+            )
         return None
 
-    def  _run_post_update_routines(self, error_on_last_update,update_statistics):
+    @staticmethod
+    def fetch_binance_bars_for_single_day(
+            url:str,symbol:str,
+            single_day: datetime,
+    ) -> pd.DataFrame:
         """
-        Use post init routines to configure the time series
+        Combines the endpoint construction + single-day extraction logic into one function.
+
+        Args:
+            market_type (str): "spot" or "usdm" or "futures".
+            is_daily (bool): True if daily endpoints should be used, otherwise monthly.
+            symbol (str): e.g., "BTCUSDT".
+            interval (str): e.g., "1m", "1h", "1d".
+            single_day (datetime): The date to fetch; only year-month-day is used for the filename.
+            logger (logging.Logger): Logger instance for warnings/errors.
+
+        Returns:
+            pd.DataFrame: Candlestick data for the given day, or an empty DataFrame if not found.
         """
-        super().run_after_post_init_routines()
 
-        if self.metadata is None:
-            return None
+        extract_filename = lambda url: url.split('/')[-1] if '/' in url else url
 
-        if not self.metadata.protect_from_deletion:
-            self.local_persist_manager.protect_from_deletion()
+        df_day = pd.DataFrame()  # in case of error or no data
+        max_trials = 3
+        trial = 0
+        try:
+            while trial < max_trials:
+                resp = requests.get(url)
+                if resp.status_code == 200:
+                    break
 
-        if error_on_last_update:
-            self.logger.warning("Do not register data source due to error during run")
-            return
+                logger.debug(
+                    f"No data for {symbol} on {single_day.date()}. "
+                    f"Status code: {resp.status_code} | URL: {url} trial{trial}/{max_trials} "
+                )
+                time.sleep(10)
+                trial = trial + 1
+                if trial >= max_trials:
+                    logger.warning(
+                        f"No data for {symbol} on {single_day.date()}. "
+                        f"Status code: {resp.status_code} | URL: {url} trial{trial}/{max_trials} "
+                    )
+                    return df_day
+
+            # The CSV is inside the ZIP, so open the ZIP in memory
+            z = zipfile.ZipFile(io.BytesIO(resp.content))
+            filename_csv = extract_filename(url).replace(".zip",".csv")
+
+            with z.open(filename_csv) as csv_file:
+                # Binance Klines CSV columns:
+                # 0: open_time (ms)
+                # 1: open
+                # 2: high
+                # 3: low
+                # 4: close
+                # 5: volume
+                # 6: close_time (ms)
+                # 7: quote_asset_volume
+                # 8: number_of_trades
+                # 9: taker_buy_base_asset_volume
+                # 10: taker_buy_quote_asset_volume
+                # 11: ignore
+                df_day = pd.read_csv(csv_file, header=None)
+
+                def safe_to_numeric(series):
+                    """
+                    Attempts to convert a Series to numeric.
+                    If it fails, it returns the original unconverted Series.
+                    """
+                    try:
+                        return pd.to_numeric(series)
+                    except (ValueError, TypeError):
+                        return series
+
+                # sometimes headers are present
+                if isinstance(df_day.iloc[0, 0], str):
+                    df_day = df_day.iloc[1:]
+                    df_day = df_day.apply(safe_to_numeric)
+
+                df_day.columns = [
+                    "open_time",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "close_time",
+                    "quote_asset_volume",
+                    "number_of_trades",
+                    "taker_buy_base_asset_volume",
+                    "taker_buy_quote_asset_volume",
+                    "ignore"
+                ]
+
+            # 4) Convert millisecond timestamps to UTC datetime
+            if len(df_day) > 0:
+                for time_col in ["open_time", "close_time"]:
+                    if df_day[time_col].iloc[0] > 2e14:  # ~2e14 = 200,000,000,000,000 => definitely microseconds
+                        df_day[time_col] //= 1000
+
+            df_day["close_time"] = pd.to_datetime(df_day["close_time"], unit="ms", utc=True)
+            df_day = df_day.drop(columns=["ignore"])
+            # 5) Set the 'open_time' as index (optional)
+
+        except Exception as e:
+            logger.error(f"Error downloading or reading bars for {symbol} on {single_day.date()}: {e}")
+            return pd.DataFrame()
+
+        return df_day
+
+    @staticmethod
+    def get_binance_bars_url(market_type, dump_frequency_daily, symbol, interval, date: datetime):
+        """
+        Constructs the full Binance .zip file URL for Kline data.
+
+        Args:
+            market_type (str): "spot" or "futures" or "usdm".
+            is_daily (bool): True for daily data folder (used by Binance), else monthly.
+            symbol (str): Trading pair symbol (e.g., "BTCUSDT").
+            interval (str): Kline interval (e.g., "1d", "1h").
+            date (datetime): Date object indicating which month to retrieve.
+
+        Returns:
+            str: Full URL to the .zip file (e.g., .../BTCUSDT-1d-2019-09.zip)
+        """
+        # Normalize inputs
+        symbol = symbol.upper()
+        interval = interval.lower()
+        yyyy_mm = date.strftime("%Y-%m")
+
+        # Define root URLs
+        base_url = "https://data.binance.vision/data"
+        if market_type == MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
+
+            root = "futures/um"
+        else:
+
+            root = "spot"
+
+        folder = "daily" if dump_frequency_daily else "monthly"
+        if dump_frequency_daily:
+            date_str = date.strftime("%Y-%m-%d")
+            file_extension = ".zip"
+        else:
+            date_str = date.strftime("%Y-%m")
+            file_extension = ".zip"
+
+        # Construct file name and full URL
+        file_name = f"{symbol}-{interval}-{date_str}{file_extension}"
+        url = f"{base_url}/{root}/{folder}/klines/{symbol}/{interval}/{file_name}"
+        return url
+
+    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex) -> pd.DataFrame:
+        """Fetches pre-aggregated klines for each day in the date range."""
+        all_dfs = []
+        symbol_info = self.info_map[uid]
+        frequency_id = self.bar_configuration.frequency_id
+
+        dump_frequency_daily=self.bar_configuration.frequency_id!="1d"
+
+        if dump_frequency_daily ==False:
+            date_range=[d.replace(day=1) for d in date_range]
+            date_range =set(date_range)
+
+        for day in tqdm(date_range, desc=f"Fetching klines for {uid}", leave=False):
+
+            url=self.get_binance_bars_url(market_type=symbol_info["api_source"],
+                                                dump_frequency_daily=dump_frequency_daily,
+                                                symbol=symbol_info["binance_symbol"],
+                                               date=day,
+                                                interval=frequency_id,)
+            try:
+                url = url.replace("2019", "2024")
+                daily_df = self.fetch_binance_bars_for_single_day(
+                    url=url,
+                    symbol=symbol_info["binance_symbol"],
+                    single_day=day,
+                )
+                if not daily_df.empty:
+                    daily_df = daily_df.set_index("close_time")
+                    all_dfs.append(daily_df)
+            except NoDataInURL:
+                logger.debug(f"No kline data URL for {uid} on {day.date()}.")
+            except Exception as e:
+                logger.error(f"Error fetching klines for {uid} on {day.date()}: {e}")
+
+        if not all_dfs: return pd.DataFrame()
+
+        asset_df = pd.concat(all_dfs, axis=0)
+        asset_df.index.name = "time_index"
+        asset_df["unique_identifier"] = uid
+        return asset_df.set_index("unique_identifier", append=True)
 
 
-
-class BinanceBarsFromTrades(BaseBinanceEndpoint, TimeSerie):
+class BinanceBarsFromTrades(BaseBinanceEndpoint):
     """
-    Creates Bars Aggregation in time from transactions
+    TimeSerie for fetching raw trades from Binance and aggregating them into 1-minute bars.
     """
     BATCH_UPDATE_DAYS = 365
     LAST_AVAILABLE_DAYS = 1
     def __init__(
             self,
-            asset_list: List,
-            local_kwargs_to_ignore: List[str] = ["asset_list"],
             *args,
             **kwargs
     ):
+        # Frequency is fixed to 1 minute for this data source
+        super().__init__(*args, **kwargs     )
+
+    def _get_url_and_root_for_chunk(self, symbol_info: dict, chunk_date: datetime.datetime) -> tuple[str, str]:
+        """Constructs the download URL and file root for a specific chunk's trades."""
+        is_daily = (datetime.datetime.now().date() - chunk_date.date()).days <= 33
+        api_source = symbol_info["api_source"]
+        binance_symbol = symbol_info["binance_symbol"]
+
+        if api_source == MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
+            root_url = CONFIG.FUTURES_USDM_DAY_ROOT_URL if is_daily else CONFIG.FUTURES_USDM_MONTH_ROOT_URL
+        else:
+            root_url = CONFIG.SPOT_DAY_ROOT_URL if is_daily else CONFIG.SPOT_MONTH_ROOT_URL
+
+        date_str = chunk_date.strftime("%Y-%m-%d") if is_daily else chunk_date.strftime("%Y-%m")
+        file_root = f"{binance_symbol}-trades-{date_str}"
+        url = f"{root_url}{binance_symbol}/{file_root}.zip"
+        return url, file_root
+
+    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex) -> pd.DataFrame:
         """
-        Args:
-            asset_list (List): List of assets.
-            back_fill_futures_with_spot (bool): If True, futures are back-filled with spot prices.
-            spot_pair (Union[str, None], optional): The spot pair. Defaults to None.
-            *args: Additional arguments.
-            **kwargs: Additional keyword arguments.
+        Orchestrates fetching raw trades and aggregating them into bars based on the bar_config.
         """
+        all_dfs = []
+        info_bar_state = None
+        symbol_info = self.info_map[uid]
 
-        frequency_id = "1m" # fixed for binance bars from trades
-        super().__init__(asset_list=asset_list,
-                         frequency_id=frequency_id,
-                         local_kwargs_to_ignore=local_kwargs_to_ignore, *args, **kwargs)
+        # Intelligent Chunking Logic
+        processing_chunks = []
+        processed_months = set()
+        for day in date_range:
+            is_daily = (datetime.datetime.now().date() - day.date()).days <= 33
+            if is_daily:
+                processing_chunks.append(day)
+            else:
+                month_key = day.strftime("%Y-%m")
+                if month_key not in processed_months:
+                    processing_chunks.append(day)
+                    processed_months.add(month_key)
 
-        self.bars_source = "binance_trades"
+        for chunk_date in tqdm(processing_chunks, desc=f"Processing {uid}", leave=False):
+            url, file_root = self._get_url_and_root_for_chunk(symbol_info, chunk_date)
 
-    def _run_post_update_routines(self, error_on_last_update: bool,update_statistics ):
-        """
-        Use post init routines to configure the time series
-        """
-        super().run_after_post_init_routines()
-        if error_on_last_update:
-            self.logger.warning("Do not register data source due to error during run")
-            return
+            if isinstance(self.bar_configuration, TimeBarConfig):
 
-        from mainsequence.client import HistoricalBarsSource
-        raise NotImplementedError
-        # register_mts_in_backed(
-        #     time_serie=self,
-        #     execution_venues_symbol=ASSETS_ORM_CONSTANTS.BINANCE_EV_SYMBOL,
-        #     data_mode=ASSETS_ORM_CONSTANTS.DATA_MODE_BACKTEST,
-        #     data_source_description=f"Historical bars from binance extracted from trades, include vwap",
-        # )
+                tmp_bars = get_bars_by_date_optimized(
+                    url=url, file_root=file_root, api_source=symbol_info["api_source"],
+                    bars_frequency=self.bar_configuration.frequency_id,
+                )
+                COLUMNS = ["open", "high", "low", "volume", "close", "vwap", "open_time",
+                           ]
+                tmp_bars=tmp_bars[COLUMNS]
+                if not tmp_bars.empty: all_dfs.append(tmp_bars)
 
+            elif isinstance(self.bar_configuration, ImbalanceBarConfig):
+                completed_bars, new_state = get_information_bars(
+                    url=url, file_root=file_root, api_source=symbol_info["api_source"],
+                    ema_alpha=self.bar_configuration.ema_alpha, warmup_bars=self.bar_configuration.warmup_bars,
+                    warmup_lookahead_trades=self.bar_configuration.warmup_lookahead_trades,
+                    previous_day_state=info_bar_state
+                )
+                COLUMNS = {
+                    'open': "The price of the very first trade that occurred within the bar.",
+                    'high': "The highest trade price observed during the formation of the bar.",
+                    'low': "The lowest trade price observed during the formation of the bar.",
+                    'close': "The price of the final trade that caused the bar to be completed.",
+                    'volume': "The total sum of the quantity of all trades that make up the bar.",
+                    'vwap': "The Volume-Weighted Average Price of all trades within the bar.",
+                    'open_time': "The timestamp of the first trade in the bar. Note that the DataFrame's index is the bar's closing time.",
+                    'imbalance_at_close': "The final value of the cumulative signed volume (buy volume - sell volume) at the exact moment the bar was formed. This is the value that met or exceeded the dynamic threshold, triggering the bar's creation."
+                }
+                completed_bars=completed_bars[list(COLUMNS.keys())]
+                if not completed_bars.empty: all_dfs.append(completed_bars)
+                info_bar_state = new_state
 
-    def update(self, update_statistics):
-        df = super().update(update_statistics)
-        if df.shape[0] > 1e7:
-            self.local_persist_manager.metadata._drop_indices = True
-            self.local_persist_manager.metadata._rebuild_indices = True
+        if not all_dfs: return pd.DataFrame()
 
-        return df
+        asset_df = pd.concat(all_dfs, axis=0)
+
+        asset_df["unique_identifier"] = uid
+        return asset_df.set_index("unique_identifier", append=True)

@@ -7,7 +7,6 @@ from mainsequence.client import Asset, DataFrequency, AssetCategory
 import psutil
 import pandas as pd
 from mainsequence.client.utils import DoesNotExist
-from mainsequence.client.models_helpers import  MarketsTimeSeriesDetails
 from typing import List
 
 NAME_CRYPTO_MARKET_CAP_TOP10 = f"Top {10} Crypto Market Cap"
