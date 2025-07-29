@@ -120,18 +120,14 @@ class BaseBinanceEndpoint(TimeSerie):
             bar_configuration: BarConfiguration,
             local_kwargs_to_ignore: List[str] = ["asset_list","asset_category_identifier"],
             asset_category_identifier: Optional[str] = None,
-
             *args,
             **kwargs
     ):
         super().__init__(*args, **kwargs)
-
-
-
         self.asset_list = asset_list
         if asset_category_identifier is not None:
             assert self.asset_list is None, "asset list should be empty if using an asset category identifier"
-        self.asset_category_identifier=asset_category_identifier
+        self.asset_category_identifier = asset_category_identifier
         self.bar_configuration = bar_configuration
         self.info_map: Dict[str, dict] = {}
 
@@ -166,10 +162,9 @@ class BaseBinanceEndpoint(TimeSerie):
 
     def get_asset_list(self):
         if self.asset_list is None:
-
             # get them through main sequence figi class and exchange
-            target_category=ms_client.AssetCategory.get(unique_identifier=self.asset_category_identifier)
-            asset_list=ms_client.Asset.filter(id__in=target_category.assets)
+            target_category = ms_client.AssetCategory.get(unique_identifier=self.asset_category_identifier)
+            asset_list = ms_client.Asset.filter(id__in=target_category.assets)
             # return binance_futures+binance_currency_pairs
             self.logger.warning("Only using currency pair for now due to timeouts in updating - add futures later")
             return asset_list
@@ -196,8 +191,6 @@ class BaseBinanceEndpoint(TimeSerie):
         """Main update orchestrator."""
         if not self.info_map:
             self._init_info_map(update_statistics.asset_list)
-
-
 
         # 1. Get active assets and their historical start dates
         active_uids, start_date_map = self._get_active_assets_and_start_dates(update_statistics)
@@ -331,19 +324,17 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
     ):
 
         super().__init__(*args, **kwargs        )
-
-        assert isinstance(self.bar_configuration,TimeBarConfig)
-
+        assert isinstance(self.bar_configuration, TimeBarConfig)
 
     def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
         # Logic from original code for automatic VAM creation
         is_dynamic = self.asset_list is None
-        if is_dynamic and self.frequency_id != "1m":
-            identifier = f"binance_{self.frequency_id}_bars"
+        if is_dynamic and self.bar_configuration.frequency_id != "1m":
+            identifier = f"binance_{self.bar_configuration.frequency_id}_bars"
             return ms_client.TableMetaData(
                 identifier=identifier,
-                description=f"Binance {self.frequency_id} bars, does not include vwap",
-                data_frequency_id=DataFrequency(self.frequency_id),
+                description=f"Binance {self.bar_configuration.frequency_id} bars, does not include vwap",
+                data_frequency_id=DataFrequency(self.bar_configuration.frequency_id),
             )
         return None
 
