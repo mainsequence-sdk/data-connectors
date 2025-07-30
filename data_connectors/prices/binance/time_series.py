@@ -269,12 +269,11 @@ class BaseBinanceEndpoint(TimeSerie):
             return pd.DataFrame()
 
         # Simple memory check
-        if not has_sufficient_memory(CONFIG.MEMORY_THRESHOLD):
-            logger.warning("Memory usage too high, aborting parallel fetch.")
-            return pd.DataFrame()
-
         n_jobs = min(os.cpu_count() or 1, 5)  # Limit jobs to avoid rate limits / DB issues
-        n_jobs=1
+
+        if not has_sufficient_memory(CONFIG.MEMORY_THRESHOLD):
+            logger.warning("Memory usage too high, use sequential fetch.")
+            n_jobs = 1
 
         results = Parallel(n_jobs=n_jobs)(
             delayed(self._process_single_asset)(uid, date_range)
@@ -327,7 +326,6 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
         assert isinstance(self.bar_configuration, TimeBarConfig)
 
     def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
-        # Logic from original code for automatic VAM creation
         is_dynamic = self.asset_list is None
         if is_dynamic and self.bar_configuration.frequency_id != "1m":
             identifier = f"binance_{self.bar_configuration.frequency_id}_bars"
@@ -496,21 +494,21 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
         symbol_info = self.info_map[uid]
         frequency_id = self.bar_configuration.frequency_id
 
-        dump_frequency_daily=self.bar_configuration.frequency_id!="1d"
+        dump_frequency_daily = self.bar_configuration.frequency_id != "1d"
 
-        if dump_frequency_daily ==False:
-            date_range=[d.replace(day=1) for d in date_range]
-            date_range =set(date_range)
+        if dump_frequency_daily == False:
+            date_range = [d.replace(day=1) for d in date_range]
+            date_range = set(date_range)
 
         for day in tqdm(date_range, desc=f"Fetching klines for {uid}", leave=False):
-
-            url=self.get_binance_bars_url(market_type=symbol_info["api_source"],
-                                                dump_frequency_daily=dump_frequency_daily,
-                                                symbol=symbol_info["binance_symbol"],
-                                               date=day,
-                                                interval=frequency_id,)
+            url = self.get_binance_bars_url(
+                market_type=symbol_info["api_source"],
+                dump_frequency_daily=dump_frequency_daily,
+                symbol=symbol_info["binance_symbol"],
+                date=day,
+                interval=frequency_id
+            )
             try:
-                url = url.replace("2019", "2024")
                 daily_df = self.fetch_binance_bars_for_single_day(
                     url=url,
                     symbol=symbol_info["binance_symbol"],
