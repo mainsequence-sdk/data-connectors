@@ -30,12 +30,12 @@ def test_binance_bars_from_trades(bar_type="time"):
 
     future_assets = AssetFutureUSDM.filter(ticker__in=["BTCUSDT", "ETHUSDT", "1000SHIBUSDT"])
     spot_assets = AssetCurrencyPair.filter(ticker__in=["BTCUSDT", "ETHUSDT", "SHIBUSDT"])
-    if bar_type== "time":
-        bar_configuration=TimeBarConfig(frequency_id="1m")
+    if bar_type == "time":
+        bar_configuration = TimeBarConfig(frequency_id="1m")
     else:
-        bar_configuration=ImbalanceBarConfig()
-    ts = BinanceBarsFromTrades(asset_list=future_assets,bar_configuration=bar_configuration)
-    ts.run(debug_mode=True,force_update=True)
+        bar_configuration = ImbalanceBarConfig()
+    ts = BinanceBarsFromTrades(asset_list=future_assets, bar_configuration=bar_configuration)
+    ts.run(debug_mode=True, force_update=True)
 
 def test_binance_daily_bars():
     from data_connectors.prices.binance.time_series import BinanceHistoricalBars,TimeBarConfig
@@ -45,7 +45,6 @@ def test_binance_daily_bars():
 
     ts = BinanceHistoricalBars(asset_list=future_assets,  bar_configuration=TimeBarConfig(frequency_id="1d"))
     ts.run(debug_mode=True,force_update=True)
-
 
 def test_alpaca_bars():
     from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
@@ -135,9 +134,9 @@ def test_equity_fundamentals():
 # test_binance_bars_from_trades()
 test_binance_daily_bars()
 # test_alpaca_bars()
+# test_alpaca_bars_small()
 # test_crypto_market_cap()
 # test_equity_market_cap()
-# test_alpaca_bars_small()
 # test_databento_bars_small()
 # test_databento_market_cap_small()
 # test_databento_bars()
