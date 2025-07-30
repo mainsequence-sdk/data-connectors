@@ -28,8 +28,8 @@ def test_binance_bars_from_trades(bar_type="time"):
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades,TimeBarConfig,ImbalanceBarConfig
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
 
-    future_assets = AssetFutureUSDM.filter(ticker__in=["BTCUSDT", "ETHUSDT", "1000SHIBUSDT"])
-    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTCUSDT", "ETHUSDT", "SHIBUSDT"])
+    future_assets = AssetFutureUSDM.filter(ticker__in=["BTC-USDT", "ETH-USDT", "1000SHIB-USDT"])
+    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
     if bar_type== "time":
         bar_configuration=TimeBarConfig(frequency_id="1m")
     else:
@@ -40,8 +40,8 @@ def test_binance_bars_from_trades(bar_type="time"):
 def test_binance_daily_bars():
     from data_connectors.prices.binance.time_series import BinanceHistoricalBars,TimeBarConfig
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
-    future_assets = AssetFutureUSDM.filter(ticker__in=["BTCUSDT", "ETHUSDT", "1000SHIBUSDT"])
-    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTCUSDT", "ETHUSDT", "SHIBUSDT"])
+    future_assets = AssetFutureUSDM.filter(ticker__in=["BTC-USDT", "ETHU-SDT", "1000SHIB-USDT"])
+    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
 
     ts = BinanceHistoricalBars(asset_list=future_assets,  bar_configuration=TimeBarConfig(frequency_id="1d"))
     ts.run(debug_mode=True,force_update=True)
@@ -106,8 +106,8 @@ def test_api_time_series():
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
 
-    future_assets = AssetFutureUSDM.filter(symbol__in=["BTCUSDT", "ETHUSDT", "1000SHIBUSDT"])
-    spot_assets = AssetCurrencyPair.filter(symbol__in=["BTCUSDT", "ETHUSDT", "SHIBUSDT"])
+    future_assets = AssetFutureUSDM.filter(symbol__in=["BTC-USDT", "ETH-USDT", "1000SHIB-USDT"])
+    spot_assets = AssetCurrencyPair.filter(symbol__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
 
     ts = BinanceBarsFromTrades(asset_list=[spot_assets[0]] + [future_assets[0]])
 
