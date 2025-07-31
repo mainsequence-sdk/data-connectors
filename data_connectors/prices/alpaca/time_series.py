@@ -1,5 +1,8 @@
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
-from mainsequence.client import UpdateStatistics, AssetCurrencyPair, Asset, DataFrequency, MARKETS_CONSTANTS, AssetCategory
+from mainsequence.client import UpdateStatistics, AssetCurrencyPair, Asset, DataFrequency, MARKETS_CONSTANTS
+
+import mainsequence.client as ms_client
+
 from alpaca.data.requests import CryptoBarsRequest
 from alpaca.data.historical import CryptoHistoricalDataClient
 
@@ -206,7 +209,7 @@ class AlpacaEquityBars(TimeSerie):
             return None
         return client
 
-    def _get_asset_list(self) -> Union[None, list]:
+    def get_asset_list(self) -> Union[None, list]:
         if self.asset_list is None:
             assets = get_stock_assets()
 
