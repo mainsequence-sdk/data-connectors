@@ -28,7 +28,8 @@ from ...utils import NAME_US_EQUITY_MARKET_CAP_TOP100, get_stock_assets, registe
 ALPACA_API_KEY = os.environ.get('ALPACA_API_KEY', None)
 ALPACA_SECRET_KEY = os.environ.get('ALPACA_SECRET_KEY', None)
 EQUITIES_TYPE=[ MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
-                   MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP
+                   MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
+                MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_REIT,
                    ]
 
 
@@ -86,8 +87,7 @@ class AlpacaEquityBars(TimeSerie):
         self.frequency_id = frequency_id
         self.asset_list = asset_list
         self.use_vam_assets = False
-        if self.asset_list is None:
-            self.use_vam_assets = True
+
         self.timeframe = self._get_timeframe()
         self.adjustment = Adjustment(adjustment)
 
@@ -218,13 +218,8 @@ class AlpacaEquityBars(TimeSerie):
         if self.asset_list is None:
             assets = get_stock_assets()
 
-            alpaca_assets = Asset.filter(
-                main_sequence_share_class__in=[
-                    a.main_sequence_share_class for a in assets
-                ],
-                execution_venue__symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-            )
-            self.asset_list = alpaca_assets
+
+            self.asset_list = assets
 
         self.asset_calendar_map = {a.unique_identifier: a.get_calendar().name for a in self.asset_list}
         return self.asset_list
@@ -356,7 +351,7 @@ class AlpacaEquityBars(TimeSerie):
             return meta
         return None
 
-    def _run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
+    def run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
         super().run_after_post_init_routines()
 
         if self.metadata is None:

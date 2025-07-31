@@ -129,8 +129,7 @@ def get_stock_assets(inlcude_etfs=True):
     if inlcude_etfs:
         assets_etfs=Asset.filter(
             ticker__in=ETFS_MAIN_TICKERS,
-            exchange_code_="US",
-            execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+            exchange_code="US",
             security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
             security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
         )

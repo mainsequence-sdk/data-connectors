@@ -49,9 +49,10 @@ def test_binance_daily_bars():
 def test_alpaca_bars():
     from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
     from mainsequence.client import  Asset
-    asset_list=Asset.filter(ticker__in=["AIG","OXY"])
-    ts = AlpacaEquityBars(asset_list=asset_list, frequency_id="1d", adjustment="all")
-    ts.run(debug_mode=True, force_update=True)
+    ts = AlpacaEquityBars( asset_list=None,frequency_id="1d", adjustment="all")
+    ts.run(debug_mode=True,
+
+           force_update=True)
 
 def test_alpaca_bars_small():
     from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
@@ -134,9 +135,9 @@ def test_equity_fundamentals():
 # test_api_time_series()
 # test_binance_bars_from_trades()
 # test_binance_daily_bars()
-# test_alpaca_bars()
+test_alpaca_bars()
 # test_crypto_market_cap()
-test_equity_market_cap()
+# test_equity_market_cap()
 # test_alpaca_bars_small()
 # test_databento_bars_small()
 # test_databento_market_cap_small()
