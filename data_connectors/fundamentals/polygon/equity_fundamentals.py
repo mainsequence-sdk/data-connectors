@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 import pytz
 from typing import List, Optional
 from tqdm import tqdm
-from .utils import approximate_market_cap_with_polygon,get_polygon_financials
+from data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials
 import json
 import json
-from ..utils import NAME_ALPACA_MARKET_CAP, get_stock_assets, register_mts_in_backed
-from mainsequence.client import MarketsTimeSeriesDetails, DataFrequency, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
-
+from data_connectors.utils import NAME_ALPACA_MARKET_CAP, get_stock_assets, register_mts_in_backed
+from mainsequence.client import  DataFrequency, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
+import mainsequence.client as ms_client
 
 class PolygonBaseTimeSeries(TimeSerie):
     """
@@ -38,18 +38,15 @@ class PolygonBaseTimeSeries(TimeSerie):
         super().__init__(*args, **kwargs)
         self.asset_list = asset_list
 
-        # If no asset_list is passed, we'll rely on the subclass to define _get_default_asset_list
-        self.use_vam_assets = False
-        if asset_list is None:
-            self.use_vam_assets = True
-        else:
-            # Optional check: ensure all assets have the same venue
-            assert all(
-                [
-                    a.execution_venue.symbol == MARKETS_CONSTANTS.FIGI_COMPOSITE_EV
-                    for a in asset_list
-                ]
-            ), f"Execution Venue in all assets should be {MARKETS_CONSTANTS.FIGI_COMPOSITE_EV}"
+
+        # else:
+        #     # Optional check: ensure all assets have the same venue
+        #     assert all(
+        #         [
+        #             a.current_snapshot.exchange_code ==None
+        #             for a in asset_list
+        #         ]
+        #     ), f"Execution Venue in all assets should be None Execution VEnue"
 
     def dependencies(self):
         return {}
@@ -80,15 +77,15 @@ class PolygonBaseTimeSeries(TimeSerie):
         )
         provider_data_list = []
 
-        for asset in tqdm(self.asset_list):
-            from_date = update_statistics.update_statistics[asset.unique_identifier]
+        for asset in tqdm(update_statistics.asset_list):
+            from_date = update_statistics.get_last_update_index_2d(asset.unique_identifier)
 
             if from_date >= last_available_update:
                 continue
 
             # Call the subclass-specific method to retrieve data
             provider_data = self._get_provider_data(
-                from_date=from_date, symbol=asset.ticker, to_date=last_available_update
+                from_date=from_date, symbol=asset.current_snapshot.ticker, to_date=last_available_update
             )
 
             # Filter any data older than 'from_date'
@@ -109,14 +106,11 @@ class PolygonBaseTimeSeries(TimeSerie):
         provider_data = provider_data[~provider_data.index.duplicated(keep='first')]
         return provider_data
 
-    def _register_in_backend(self):
-        """
-        Each subclass can implement how to register itself in the backend
-        (unique_identifier, description, etc.).
-        """
-        raise NotImplementedError("Subclass must implement how to register in backend.")
 
-    def  _run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
+
+
+
+    def  run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
         """
         Common post-update steps plus a call to subclass's `_register_in_backend`.
         """
@@ -128,8 +122,7 @@ class PolygonBaseTimeSeries(TimeSerie):
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
 
-        # Let each subclass handle its own backend registration
-        self._register_in_backend(update_statistics)
+
 
 
 class PolygonDailyMarketCap(PolygonBaseTimeSeries):
@@ -140,11 +133,12 @@ class PolygonDailyMarketCap(PolygonBaseTimeSeries):
     Uses 'approximate_with_polygon' internally.
     """
 
-    def _get_asset_list(self):
+    def get_asset_list(self):
         """
         Example default set of assets for daily market cap.
         """
-        self.asset_list = get_stock_assets()
+        if self.asset_list is None:
+            self.asset_list = get_stock_assets(inlcude_etfs=False)
         return self.asset_list
 
     def _get_provider_data(self, from_date: datetime, symbol: str, to_date: datetime) -> pd.DataFrame:
@@ -158,50 +152,19 @@ class PolygonDailyMarketCap(PolygonBaseTimeSeries):
             to_date=to_date,
         )
 
-    def _register_in_backend(self, update_statistics):
-        """
-        Register 'Daily Market Cap Data' with the specific unique_identifier
-        for historical market cap.
-        """
-        register_mts_in_backed(
-            unique_identifier="polygon_historical_marketcap",
-            time_serie=self,
+
+    def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
+        # Logic from original code for automatic VAM creation
+
+        identifier = f"polygon_historical_marketcap"
+        return ms_client.TableMetaData(
+            identifier=identifier,
+            description="Daily Market Cap Data From Polygon",
             data_frequency_id=DataFrequency.one_d,
-            description="Daily Market Cap Data",
-            asset_list=update_statistics.asset_list
         )
 
-        # updater category from last_obsevation
-        last_observation = self.get_last_observation()
 
-        if last_observation is not None:
-            last_date = last_observation.index[0][0]
-            last_observation = last_observation["market_cap"].sort_values(ascending=False)
-            last_observation = last_observation.iloc[:100]
-            all_assets = Asset.filter(
-                unique_identifier__in=last_observation.index.get_level_values("unique_identifier").to_list(),
-                real_figi=False
-            )
-            asset_map = {a.unique_identifier: a.id for a in all_assets}
-            last_observation = last_observation.reset_index()
-            last_observation = last_observation[last_observation["unique_identifier"].isin(asset_map.keys())]
-            last_observation["asset_id"] = last_observation["unique_identifier"].map(asset_map).astype(int)
-            for i in [10, 50, 100]:
-                subset = last_observation.iloc[:i]
 
-                name = NAME_ALPACA_MARKET_CAP[i]
-                asset_category = AssetCategory.filter(display_name=name)
-                if len(asset_category) == 0:
-                    asset_category = AssetCategory.create(
-                        display_name=name,
-                        source="polygon",
-                        description=f"This category contains the top {i} US Equities by market cap as of {last_date}",
-                        unique_id=name.replace(" ", "_").lower(),
-                    )
-                    print(f"Created Categories: US Equity: {asset_category}")
-                else:
-                    asset_category = asset_category[0]
-                asset_category.patch(assets=subset["asset_id"].to_list())
 
 
 class PolygonQFundamentals(PolygonBaseTimeSeries):
@@ -210,7 +173,7 @@ class PolygonQFundamentals(PolygonBaseTimeSeries):
     (e.g. approximate_with_polygon_fundamentals) and registers itself differently.
     """
 
-    def _get_asset_list(self):
+    def get_asset_list(self):
         # Example only; pick whichever set of assets applies to 'fundamentals'
         self.asset_list = get_stock_assets()
         return self.asset_list
@@ -292,12 +255,5 @@ class PolygonQFundamentals(PolygonBaseTimeSeries):
 
         return df
 
-    def _register_in_backend(self,update_statistics):
-        from mainsequence.client import MarketsTimeSeriesDetails, DataFrequency
-        register_mts_in_backed(  unique_identifier="polygon_historical_fundamentals",
-            time_serie=self,
-            data_frequency_id=DataFrequency.one_quarter,
-            description="Quarterly Fundamentals Data provided by Polygon",
-            asset_list=update_statistics.asset_list )
 
 

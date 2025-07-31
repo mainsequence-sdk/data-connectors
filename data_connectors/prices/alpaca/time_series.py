@@ -120,16 +120,21 @@ class AlpacaEquityBars(TimeSerie):
 
         return TimeFrame(amount=frequency_amount, unit=self.FREQ_TO_TIMEFRAME_UNIT[frequency_unit])
 
-    def _process_asset_request(self, asset, max_per_asset_symbol, last_available_value, client, calendars):
+    def _process_asset_request(self, asset, last_update:datetime.datetime, last_available_value, client, calendars):
         if client is None:
             return None
 
-        symbol = asset.ticker
-        symbol_latest_value = max_per_asset_symbol
-        if symbol_latest_value >= last_available_value:
+        max_skip = last_update + datetime.timedelta(
+            days=360)
+        if max_skip < datetime.datetime.now(pytz.utc):
+            last_available_value = max_skip
+
+
+        symbol = asset.current_snapshot.ticker
+        if last_update >= last_available_value:
             return None
 
-        start_year = symbol_latest_value.year
+        start_year = last_update.year
         end_year = last_available_value.year
         years = range(start_year, end_year + 1)
 
@@ -137,9 +142,9 @@ class AlpacaEquityBars(TimeSerie):
 
         # Prepare the requests to send later in the thread pool
         requests = []
-        for year in tqdm(years, desc=f"Processing from {symbol_latest_value} to {last_available_value} for {symbol}",
+        for year in tqdm(years, desc=f"Processing from {last_update} to {last_available_value} for {symbol}",
                          leave=False):
-            current_start = max(symbol_latest_value, datetime.datetime(year, 1, 1, tzinfo=pytz.utc))
+            current_start = max(last_update, datetime.datetime(year, 1, 1, tzinfo=pytz.utc))
             current_end = min(last_available_value,
                               datetime.datetime(year, 12, 31, 23, 59, 59, 999999, tzinfo=pytz.utc))
 
@@ -224,59 +229,8 @@ class AlpacaEquityBars(TimeSerie):
         self.asset_calendar_map = {a.unique_identifier: a.get_calendar().name for a in self.asset_list}
         return self.asset_list
 
-    # Add this new helper method to your AlpacaEquityBars class
-    def _prepare_update_scope(self, update_statistics: UpdateStatistics) -> Tuple[
-        bool, UpdateStatistics, datetime.datetime, Dict]:
-        """
-        Prepares all variables needed for an update run. It replicates the initial
-        setup block from the original update method precisely.
 
-        Returns:
-            A tuple containing:
-            - bool: True if the update should proceed, False otherwise.
-            - UpdateStatistics: The potentially modified statistics object.
-            - datetime: The final 'last_available_value' to use for fetching.
-            - dict: The dictionary of market calendars.
-        """
-        calendars = {str(cal): mcal.get_calendar(cal.replace("ARCA", "XNYS").replace("AMEX", "XNYS")) for cal in
-                     np.unique(list(self.asset_calendar_map.values()))}
-        last_available_value = datetime.datetime.now(pytz.utc).replace(hour=0, minute=0, second=0,
-                                                                       microsecond=0) - datetime.timedelta(minutes=1)
-
-        # This block is a direct copy of your original logic
-        if update_statistics.is_empty():
-            # This logic now correctly reflects the original implementation
-            min_max = [update_statistics.get_min_latest_value(),
-                       datetime.datetime.now(pytz.utc).replace(hour=0, minute=0, second=0)]
-            calendar_max_closes = {}
-            for cal_name, cal in calendars.items():
-                full_schedule = cal.schedule(*min_max)
-                if not full_schedule.empty:
-                    calendar_max_closes[cal_name] = full_schedule.iloc[-1]["market_close"]
-
-            asset_identifier_to_update = []
-            for a in update_statistics.asset_list:
-                latest_market_close = calendar_max_closes.get(self.asset_calendar_map.get(a.unique_identifier))
-                if latest_market_close and update_statistics[a.unique_identifier] < latest_market_close:
-                    asset_identifier_to_update.append(a.unique_identifier)
-
-            if not asset_identifier_to_update:
-                self.logger.info(
-                    f"Nothing to update, prices not yet available in calendars {list(calendar_max_closes.keys())}")
-                return False, None, None, None  # Signal to stop
-
-            update_statistics = update_statistics.update_assets(update_statistics.asset_list)
-
-        # This logic for max_skip is also preserved from the original
-        max_skip = update_statistics.get_max_latest_value(init_fallback_date=self.OFFSET_START) + datetime.timedelta(
-            days=360)
-        if max_skip < datetime.datetime.now(pytz.utc):
-            last_available_value = max_skip
-
-        return True, update_statistics, last_available_value, calendars
-
-    def _fetch_data_concurrently(self, assets_to_update: list, update_statistics: UpdateStatistics,
-                                 calendars: dict) -> pd.DataFrame:
+    def _fetch_data_concurrently(self, update_statistics:UpdateStatistics,calendars) -> pd.DataFrame:
         """
         Uses a thread pool to fetch data for all specified assets from the Alpaca API.
         """
@@ -284,26 +238,23 @@ class AlpacaEquityBars(TimeSerie):
 
         bars_request_df = []  # Using the original variable name
         workers = int(os.environ.get("ALPACA_MAX_WORKERS", 5))
-
+        workers=1
         # Calculate the lookback limit
         last_available_value = datetime.datetime.now(pytz.utc).replace(hour=0, minute=0, second=0) - datetime.timedelta(
             minutes=1)
-        max_skip = update_statistics.get_max_latest_value(init_fallback_date=self.OFFSET_START) + datetime.timedelta(
-            days=360)
-        if max_skip < datetime.datetime.now(pytz.utc):
-            last_available_value = max_skip
+
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = [
                 executor.submit(
                     self._process_asset_request,
                     asset=asset,
-                    max_per_asset_symbol=update_statistics[asset.unique_identifier],
+                    last_update=update_statistics.get_last_update_index_2d("BBG000BQQ2S6"),
                     last_available_value=last_available_value,
                     client=self.get_client_for_asset(asset),
                     calendars=calendars
                 )
-                for asset in tqdm(assets_to_update, desc="Submitting Assets to Thread Pool")
+                for asset in tqdm(update_statistics.asset_list, desc="Submitting Assets to Thread Pool")
             ]
 
             for future in tqdm(as_completed(futures), total=len(futures), desc="Fetching Data"):
@@ -319,7 +270,7 @@ class AlpacaEquityBars(TimeSerie):
 
         return pd.concat(bars_request_df, axis=0)
 
-    def _align_timestamps(self, bars_request_df: pd.DataFrame, update_statistics: UpdateStatistics,
+    def _align_timestamps(self, bars_request_df: pd.DataFrame,
                           calendars: dict) -> pd.DataFrame:
         """
         Processes the raw DataFrame to align timestamps, set the correct index,
@@ -361,12 +312,7 @@ class AlpacaEquityBars(TimeSerie):
         if "open_time" in bars_request_df.columns:
             bars_request_df["open_time"] = bars_request_df["open_time"].astype(np.int64)
 
-        # Final filter to ensure no duplicates are persisted
-        for uid, last_update in update_statistics.items():
-            if last_update:
-                mask = (bars_request_df.index.get_level_values("unique_identifier") == uid) & (
-                            bars_request_df.index.get_level_values("time_index") <= last_update)
-                bars_request_df = bars_request_df[~mask]
+
 
         return bars_request_df
 
@@ -383,19 +329,15 @@ class AlpacaEquityBars(TimeSerie):
            5. Formats the combined data into a final DataFrame ready for persistence.
            """
 
-        # Step 1: Prepare the scope and variables for the run.
-        should_continue, stats, last_val, cals = self._prepare_update_scope(update_statistics)
-        if not should_continue:
-            return pd.DataFrame()
-
-        # Step 2: Fetch the raw data for the assets concurrently.
-        bars_request_df = self._fetch_data_concurrently(stats.asset_list, stats, cals)
+        calendars = {str(cal): mcal.get_calendar(cal.replace("ARCA", "XNYS").replace("AMEX", "XNYS")) for cal in
+                     np.unique(list(self.asset_calendar_map.values()))}
+        bars_request_df = self._fetch_data_concurrently(update_statistics,calendars=calendars)
         if bars_request_df.empty:
             self.logger.info("No new bars were returned from the API.")
             return pd.DataFrame()
 
             # Step 3: Align timestamps and finalize the DataFrame.
-        bars_request_df = self._align_timestamps(bars_request_df, stats, cals)
+        bars_request_df = self._align_timestamps(bars_request_df,calendars=calendars)
         return bars_request_df
 
 

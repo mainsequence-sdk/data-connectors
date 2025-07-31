@@ -2,14 +2,13 @@
 from dotenv import load_dotenv
 from pathlib import Path
 
-import os
 # Load environment variables from .env.example
 project_root = Path(__file__).resolve().parents[1]
 env_file_path = project_root / ".env"
 
 load_dotenv(dotenv_path=env_file_path)
 from mainsequence.tdag.time_series import TimeSerie,  APITimeSerie
-
+import mainsequence.client as ms_client
 class TestTimeSerie(TimeSerie):
     def __init__(self, data_source_id: str, local_hash_id: str, *args, **kwargs):
         self.bars = APITimeSerie(local_hash_id=local_hash_id, data_source_id=data_source_id)
@@ -50,9 +49,8 @@ def test_binance_daily_bars():
 def test_alpaca_bars():
     from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
     from mainsequence.client import  Asset
-    from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
-
-    ts = AlpacaEquityBars(asset_list=None, frequency_id="1d", adjustment="all")
+    asset_list=Asset.filter(ticker__in=["AIG","OXY"])
+    ts = AlpacaEquityBars(asset_list=asset_list, frequency_id="1d", adjustment="all")
     ts.run(debug_mode=True, force_update=True)
 
 def test_alpaca_bars_small():
@@ -115,18 +113,20 @@ def test_api_time_series():
     new_ts.run_in_debug_scheduler()
 
 def test_equity_market_cap():
-    from data_connectors.fundamentals.equity_fundamentals import PolygonDailyMarketCap
+    from data_connectors.fundamentals.polygon.equity_fundamentals import PolygonDailyMarketCap
+
     ts = PolygonDailyMarketCap(asset_list=None)
     ts.run(debug_mode=True, force_update=True)
 
 def test_crypto_market_cap():
-    from data_connectors.fundamentals.crypto_fundamentals import CoinGeckoMarketCap
+    from data_connectors.fundamentals.coingecko.crypto_fundamentals import CoinGeckoMarketCap
     ts = CoinGeckoMarketCap(asset_list=None)
     ts.run(debug_mode=True, force_update=True)
 
 def test_equity_fundamentals():
-    from data_connectors.fundamentals.equity_fundamentals import PolygonQFundamentals
-    ts = PolygonQFundamentals(asset_list=None)
+    from data_connectors.fundamentals.polygon.equity_fundamentals import PolygonQFundamentals
+    asset_list=ms_client.Asset.filter(ticker__in=["AIG","OXY"])
+    ts = PolygonQFundamentals(asset_list=asset_list)
     ts.run(debug_mode=True, force_update=True)
 
 
@@ -134,9 +134,9 @@ def test_equity_fundamentals():
 # test_api_time_series()
 # test_binance_bars_from_trades()
 # test_binance_daily_bars()
-test_alpaca_bars()
+# test_alpaca_bars()
 # test_crypto_market_cap()
-# test_equity_market_cap()
+test_equity_market_cap()
 # test_alpaca_bars_small()
 # test_databento_bars_small()
 # test_databento_market_cap_small()

@@ -76,7 +76,7 @@ def has_sufficient_memory(threshold_fraction=0.6) -> bool:
     # Return True if we are below threshold_fraction of total memory
     return (mem.used / mem.total) < threshold_fraction
 
-def get_stock_assets():
+def get_stock_assets(inlcude_etfs=True):
     unique_identifier = SP500_CATEGORY_NAME.lower().replace(" ", "_")
     sp500_cat = AssetCategory.get_or_none(unique_identifier=unique_identifier)
 
@@ -99,10 +99,10 @@ def get_stock_assets():
 
     mag_7_assets = Asset.filter(
         ticker__in=MAG_7_CATEGORY_SYMBOLS,
-        execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
         security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
         security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
-        real_figi=False,
+        exchange_code="US",
+        real_figi=True,
     )
 
     mag_7_cat.patch(assets=[a.id for a in mag_7_assets])
@@ -111,23 +111,31 @@ def get_stock_assets():
     url = "https://datahub.io/core/s-and-p-500-companies/_r/-/data/constituents.csv"
     df = pd.read_csv(url)
 
-    assets = Asset.filter(
+    equity_assets= Asset.filter(
         ticker__in=df["Symbol"].to_list(),
-        execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+        exchange_code="US",
         security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
         security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
-        real_figi=False,
     )
 
-    assets_etfs=Asset.filter(
-        ticker__in=ETFS_MAIN_TICKERS,
-        execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
+    reit_assets = Asset.filter(
+        ticker__in=df["Symbol"].to_list(),
+        exchange_code="US",
+        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_REIT,
         security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
-        real_figi=False,
     )
 
+    assets_etfs=[]
+    if inlcude_etfs:
+        assets_etfs=Asset.filter(
+            ticker__in=ETFS_MAIN_TICKERS,
+            exchange_code_="US",
+            execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+            security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
+            security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
+        )
 
+    assets=equity_assets+reit_assets
     sp500_cat.patch(assets=[a.id for a in assets])
     return assets+assets_etfs
 
