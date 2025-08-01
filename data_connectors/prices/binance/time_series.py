@@ -518,7 +518,6 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
                                                date=day,
                                                 interval=frequency_id,)
             try:
-                url = url.replace("2019", "2024")
                 daily_df = self.fetch_binance_bars_for_single_day(
                     url=url,
                     symbol=symbol_info["binance_symbol"],
