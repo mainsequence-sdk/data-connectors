@@ -242,7 +242,7 @@ class AlpacaEquityBars(TimeSerie):
                 executor.submit(
                     self._process_asset_request,
                     asset=asset,
-                    last_update=update_statistics.get_last_update_index_2d("BBG000BQQ2S6"),
+                    last_update=update_statistics.get_last_update_index_2d(asset.unique_identifier),
                     last_available_value=last_available_value,
                     client=self.get_client_for_asset(asset),
                     calendars=calendars
