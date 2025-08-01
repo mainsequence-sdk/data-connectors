@@ -182,7 +182,7 @@ def aggregate_trades_chunk(
 
 def get_bars_by_date_optimized(url, file_root, bars_frequency,
                                api_source: str, logger=None, chunksize=1_000_000,
-                               max_retries: int = 3, timeout_seconds: int = 600
+                               max_retries: int = 3, timeout_seconds: int = 600,
                                ):
     if logger is None:
         logger = FakeLogger()
