@@ -523,9 +523,13 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
                     symbol=symbol_info["binance_symbol"],
                     single_day=day,logger=logger,
                 )
-                if not daily_df.empty:
-                    daily_df = daily_df.set_index("close_time")
-                    all_dfs.append(daily_df)
+
+                if daily_df.empty:
+                    #break to do not insert daily holes
+                    self.logger.warning(f"No bars on {day} for {symbol_info['binance_symbol']}")
+
+                daily_df = daily_df.set_index("close_time")
+                all_dfs.append(daily_df)
             except NoDataInURL:
                 logger.debug(f"No kline data URL for {uid} on {day.date()}.")
             except Exception as e:
