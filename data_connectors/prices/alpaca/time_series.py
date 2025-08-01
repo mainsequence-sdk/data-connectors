@@ -340,16 +340,16 @@ class AlpacaEquityBars(TimeSerie):
         """
 
         """
-        if self.use_vam_assets == True:
-            TS_ID = f"alpaca_{self.frequency_id}_bars"
-            meta=ms_client.TableMetaData(  identifier=TS_ID,
-                                           description=f"Alpaca {self.frequency_id} Bars",
-                                           data_frequency_id=self.frequency_id,
-                                                   )
+
+        TS_ID = f"alpaca_{self.frequency_id}_bars"
+        meta=ms_client.TableMetaData(  identifier=TS_ID,
+                                       description=f"Alpaca {self.frequency_id} Bars",
+                                       data_frequency_id=self.frequency_id,
+                                               )
 
 
-            return meta
-        return None
+
+        return meta
 
     def run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
         super().run_after_post_init_routines()

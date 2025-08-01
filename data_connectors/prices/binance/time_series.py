@@ -152,14 +152,13 @@ class BaseBinanceEndpoint(TimeSerie):
         for asset in asset_list:
             # Correctly determine the symbol based on security type
             if asset.security_type == CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
-                binance_symbol = asset.currency_pair.ticker
+                binance_symbol = asset.currency_pair.current_snapshot.ticker
                 assert asset.maturity_code == "PERPETUAL"
             else:  # Assumes spot otherwise
-                binance_symbol = f"{asset.base_asset.ticker}{asset.quote_asset.ticker}"
+                binance_symbol = f"{asset.base_asset.current_snapshot.ticker}{asset.quote_asset.current_snapshot.ticker}"
 
             info_map[asset.unique_identifier] = {
                 "binance_symbol": binance_symbol,
-                "execution_venue_symbol": asset.execution_venue.symbol,
                 "api_source": asset.security_type  # Store the specific security type
             }
         self.info_map = info_map
@@ -284,14 +283,14 @@ class BaseBinanceEndpoint(TimeSerie):
         n_jobs=1
 
         results = Parallel(n_jobs=n_jobs)(
-            delayed(self._process_single_asset)(uid, date_range)
+            delayed(self._process_single_asset)(uid, date_range,self.logger)
             for uid, date_range in update_ranges.items()
         )
 
         valid_results = [df for df in results if not df.empty]
         return pd.concat(valid_results, axis=0) if valid_results else pd.DataFrame()
 
-    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex) -> pd.DataFrame:
+    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex,logger) -> pd.DataFrame:
         """
         To be implemented by subclasses. This is the core method that defines
         how data for a single asset over a date range is fetched and processed.
@@ -350,7 +349,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
     @staticmethod
     def fetch_binance_bars_for_single_day(
             url:str,symbol:str,
-            single_day: datetime,
+            single_day: datetime,logger
     ) -> pd.DataFrame:
         """
         Combines the endpoint construction + single-day extraction logic into one function.
@@ -499,7 +498,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
         url = f"{base_url}/{root}/{folder}/klines/{symbol}/{interval}/{file_name}"
         return url
 
-    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex) -> pd.DataFrame:
+    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex,logger) -> pd.DataFrame:
         """Fetches pre-aggregated klines for each day in the date range."""
         all_dfs = []
         symbol_info = self.info_map[uid]
@@ -523,7 +522,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
                 daily_df = self.fetch_binance_bars_for_single_day(
                     url=url,
                     symbol=symbol_info["binance_symbol"],
-                    single_day=day,
+                    single_day=day,logger=logger,
                 )
                 if not daily_df.empty:
                     daily_df = daily_df.set_index("close_time")
@@ -571,7 +570,7 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
         url = f"{root_url}{binance_symbol}/{file_root}.zip"
         return url, file_root
 
-    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex) -> pd.DataFrame:
+    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex,logger) -> pd.DataFrame:
         """
         Orchestrates fetching raw trades and aggregating them into bars based on the bar_config.
         """
@@ -599,7 +598,7 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
 
                 tmp_bars = get_bars_by_date_optimized(
                     url=url, file_root=file_root, api_source=symbol_info["api_source"],
-                    bars_frequency=self.bar_configuration.frequency_id,
+                    bars_frequency=self.bar_configuration.frequency_id,logger=logger
                 )
                 COLUMNS = ["open", "high", "low", "volume", "close", "vwap", "open_time",
                            ]
@@ -611,7 +610,7 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
                     url=url, file_root=file_root, api_source=symbol_info["api_source"],
                     ema_alpha=self.bar_configuration.ema_alpha, warmup_bars=self.bar_configuration.warmup_bars,
                     warmup_lookahead_trades=self.bar_configuration.warmup_lookahead_trades,
-                    previous_day_state=info_bar_state
+                    previous_day_state=info_bar_state,logger=logger
                 )
                 COLUMNS = {
                     'open': "The price of the very first trade that occurred within the bar.",

@@ -42,7 +42,7 @@ def test_binance_daily_bars():
     future_assets = AssetFutureUSDM.filter(ticker__in=["BTC-USDT", "ETHU-SDT", "1000SHIB-USDT"])
     spot_assets = AssetCurrencyPair.filter(ticker__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
 
-    ts = BinanceHistoricalBars(asset_list=future_assets,  bar_configuration=TimeBarConfig(frequency_id="1d"))
+    ts = BinanceHistoricalBars(asset_list=spot_assets,  bar_configuration=TimeBarConfig(frequency_id="1d"))
     ts.run(debug_mode=True,force_update=True)
 
 
@@ -134,8 +134,8 @@ def test_equity_fundamentals():
 
 # test_api_time_series()
 # test_binance_bars_from_trades()
-# test_binance_daily_bars()
-test_alpaca_bars()
+test_binance_daily_bars()
+# test_alpaca_bars()
 # test_crypto_market_cap()
 # test_equity_market_cap()
 # test_alpaca_bars_small()
