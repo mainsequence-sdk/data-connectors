@@ -11,7 +11,7 @@ from mainsequence.client import (
 )
 from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
 
-from ...utils import get_stock_assets, register_mts_in_backed, register_rules
+from ...utils import get_stock_assets, register_rules
 
 DATABENTO_API_KEY = os.environ.get('DATABENTO_API_KEY')
 
@@ -157,13 +157,6 @@ class DatabentoMarketCap(TimeSerie):
 
         if self.use_vam_assets:
             markets_time_series_identifier = f"databento_{self.dataset.lower().replace('.', '_')}_market_cap"
-            register_mts_in_backed(
-                unique_identifier=markets_time_series_identifier,
-                time_serie=self,
-                description=f"Databento Daily Market Cap for {self.dataset}",
-                data_frequency_id=DataFrequency.one_d,
-                asset_list=update_statistics.asset_list
-            )
 
             translation_table_identifier = "marketcap_translation_table"
             rules = [

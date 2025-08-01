@@ -9,7 +9,7 @@ from tqdm import tqdm
 from data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials
 import json
 import json
-from data_connectors.utils import NAME_ALPACA_MARKET_CAP, get_stock_assets, register_mts_in_backed
+from data_connectors.utils import NAME_ALPACA_MARKET_CAP, get_stock_assets
 from mainsequence.client import  DataFrequency, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
 import mainsequence.client as ms_client
 

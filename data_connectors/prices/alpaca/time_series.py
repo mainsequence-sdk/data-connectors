@@ -23,14 +23,15 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import traceback
 from typing import Union
-from ...utils import NAME_US_EQUITY_MARKET_CAP_TOP100, get_stock_assets, register_mts_in_backed
+from ...utils import NAME_US_EQUITY_MARKET_CAP_TOP100, get_stock_assets
 
 ALPACA_API_KEY = os.environ.get('ALPACA_API_KEY', None)
 ALPACA_SECRET_KEY = os.environ.get('ALPACA_SECRET_KEY', None)
-EQUITIES_TYPE=[ MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
-                   MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
-                MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_REIT,
-                   ]
+EQUITIES_TYPE = [
+    MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
+    MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
+    MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_REIT,
+]
 
 
 import requests
@@ -217,13 +218,10 @@ class AlpacaEquityBars(TimeSerie):
     def get_asset_list(self) -> Union[None, list]:
         if self.asset_list is None:
             assets = get_stock_assets()
-
-
             self.asset_list = assets
 
         self.asset_calendar_map = {a.unique_identifier: a.get_calendar().name for a in self.asset_list}
         return self.asset_list
-
 
     def _fetch_data_concurrently(self, update_statistics:UpdateStatistics,calendars) -> pd.DataFrame:
         """
@@ -307,8 +305,6 @@ class AlpacaEquityBars(TimeSerie):
         if "open_time" in bars_request_df.columns:
             bars_request_df["open_time"] = bars_request_df["open_time"].astype(np.int64)
 
-
-
         return bars_request_df
 
     def update(self, update_statistics: UpdateStatistics):
@@ -331,23 +327,18 @@ class AlpacaEquityBars(TimeSerie):
             self.logger.info("No new bars were returned from the API.")
             return pd.DataFrame()
 
-            # Step 3: Align timestamps and finalize the DataFrame.
+        # Step 3: Align timestamps and finalize the DataFrame.
         bars_request_df = self._align_timestamps(bars_request_df,calendars=calendars)
         return bars_request_df
 
 
     def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
-        """
-
-        """
-
         TS_ID = f"alpaca_{self.frequency_id}_bars"
-        meta=ms_client.TableMetaData(  identifier=TS_ID,
-                                       description=f"Alpaca {self.frequency_id} Bars",
-                                       data_frequency_id=self.frequency_id,
-                                               )
-
-
+        meta = ms_client.TableMetaData(
+            identifier=TS_ID,
+            description=f"Alpaca {self.frequency_id} Bars",
+            data_frequency_id=self.frequency_id,
+        )
 
         return meta
 

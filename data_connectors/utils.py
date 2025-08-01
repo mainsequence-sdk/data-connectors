@@ -138,40 +138,6 @@ def get_stock_assets(inlcude_etfs=True):
     sp500_cat.patch(assets=[a.id for a in assets])
     return assets+assets_etfs
 
-
-def register_mts_in_backed(
-        unique_identifier,
-        time_serie,
-        data_frequency_id,
-        asset_list: List[Asset],
-        description="",
-):
-    try:
-        bar_source = MarketsTimeSeriesDetails.get(
-            unique_identifier=unique_identifier,
-        )
-
-        if time_serie.use_vam_assets and bar_source.source_table.id != time_serie.metadata.id:
-            bar_source = bar_source.patch(source_table=time_serie.metadata.id)
-
-    except DoesNotExist:
-        if time_serie.use_vam_assets:
-            # if run for the first time save this as reference in VAM
-            bar_source = MarketsTimeSeriesDetails.update_or_create(
-                unique_identifier=unique_identifier,
-                source_table__id=time_serie.metadata.id,
-                data_frequency_id=data_frequency_id,
-                description=description,
-            )
-
-    if bar_source is None:
-        raise ValueError("No historical bars source found")
-
-    bar_source.append_asset_list_source(asset_list=asset_list)
-
-    return bar_source
-
-
 def register_rules(
     translation_table_identifier,
     rules,

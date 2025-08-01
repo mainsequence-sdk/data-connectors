@@ -10,7 +10,7 @@ from typing import List, Optional
 from tqdm import tqdm
 from data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials,get_latest_market_cap_coingecko
 import json
-from data_connectors.utils import NAME_CRYPTO_MARKET_CAP, register_mts_in_backed
+from data_connectors.utils import NAME_CRYPTO_MARKET_CAP
 
 
 class CoinGeckoMarketCap(TimeSerie):
@@ -107,8 +107,6 @@ class CoinGeckoMarketCap(TimeSerie):
         """
         Common post-update steps plus a call to subclass's `_register_in_backend`.
         """
-        from mainsequence.client import MarketsTimeSeriesDetails, DataFrequency
-
         if error_on_last_update:
             self.logger.warning("Do not register data source due to error during run")
             return
@@ -116,12 +114,6 @@ class CoinGeckoMarketCap(TimeSerie):
         if self.metadata is not None:
             if not self.metadata.protect_from_deletion:
                 self.local_persist_manager.protect_from_deletion()
-
-        register_mts_in_backed( unique_identifier="coingecko_market_cap",
-                time_serie=self,
-                data_frequency_id=DataFrequency.one_d,
-                description="Daily Market Cap Data from coingecko",
-                asset_list=update_statistics.asset_list,)
 
         from mainsequence.client.models_vam import  AssetCategory
 

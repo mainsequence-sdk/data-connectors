@@ -13,7 +13,7 @@ from mainsequence.tdag.time_series import TimeSerie, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-from ...utils import register_mts_in_backed, get_stock_assets
+from ...utils import get_stock_assets
 
 DATABENTO_API_KEY = os.environ.get('DATABENTO_API_KEY')
 
@@ -239,10 +239,3 @@ class DatabentoHistoricalBars(TimeSerie):
         if self.use_vam_assets:
             markets_time_series_identifier = f"databento_{self.dataset}_{self.frequency_id}_bars".lower().replace(".",
                                                                                                                   "_")
-            register_mts_in_backed(
-                unique_identifier=markets_time_series_identifier,
-                time_serie=self,
-                description=f"Databento {self.frequency_id} Bars for {self.dataset}",
-                data_frequency_id=self.frequency_id,
-                asset_list=update_statistics.asset_list
-            )
