@@ -102,7 +102,6 @@ def get_stock_assets(inlcude_etfs=True):
         security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
         security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
         exchange_code="US",
-        real_figi=True,
     )
 
     mag_7_cat.patch(assets=[a.id for a in mag_7_assets])
