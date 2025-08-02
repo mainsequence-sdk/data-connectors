@@ -128,11 +128,15 @@ class BaseBinanceEndpoint(TimeSerie):
         if asset_category_identifier is not None:
             assert self.asset_list is None, "asset list should be empty if using an asset category identifier"
         self.asset_category_identifier = asset_category_identifier
-        self.bar_configuration = bar_configuration
+        self._bar_config_dict = bar_configuration.model_dump() #needs to be passed as dict when runnignparallerl
         self.info_map: Dict[str, dict] = {}
 
         if self.asset_list is not None:
             self._init_info_map(self.asset_list)
+
+    @property
+    def bar_configuration(self) -> TimeBarConfig:
+        return TimeBarConfig(**self._bar_config_dict)
 
     def dependencies(self) -> Dict:
         return {}
