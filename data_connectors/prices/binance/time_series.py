@@ -325,8 +325,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
         assert isinstance(self.bar_configuration, TimeBarConfig)
 
     def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
-        is_dynamic = self.asset_list is None
-        if is_dynamic and self.bar_configuration.frequency_id != "1m":
+        if self.bar_configuration.frequency_id != "1m":
             identifier = f"binance_{self.bar_configuration.frequency_id}_bars"
             return ms_client.TableMetaData(
                 identifier=identifier,
