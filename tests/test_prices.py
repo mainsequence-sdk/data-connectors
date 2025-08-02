@@ -133,10 +133,10 @@ def test_equity_fundamentals():
 
 # test_api_time_series()
 # test_binance_bars_from_trades()
-test_binance_daily_bars()
+# test_binance_daily_bars()
 # test_alpaca_bars()
 # test_alpaca_bars_small()
-# test_crypto_market_cap()
+test_crypto_market_cap()
 # test_equity_market_cap()
 # test_databento_bars_small()
 # test_databento_market_cap_small()

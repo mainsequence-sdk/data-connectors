@@ -50,10 +50,9 @@ class CoinGeckoMarketCap(TimeSerie):
             return self.asset_list
         else:
             currency_assets = AssetCurrencyPair.filter(
-                execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
                 security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
                 security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_CURNCY,
-                quote_asset__ticker="USDT",
+                quote_asset__current_snapshot__ticker="USDT",
             )
             asset_list = [a.base_asset for a in currency_assets]
             self.logger.info(
