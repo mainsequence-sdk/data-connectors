@@ -104,8 +104,8 @@ def test_api_time_series():
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
 
-    future_assets = AssetFutureUSDM.filter(symbol__in=["BTC-USDT", "ETH-USDT", "1000SHIB-USDT"])
-    spot_assets = AssetCurrencyPair.filter(symbol__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
+    future_assets = AssetFutureUSDM.filter(ticker__in=["BTC-USDT", "ETH-USDT", "1000SHIB-USDT"])
+    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
 
     ts = BinanceBarsFromTrades(asset_list=[spot_assets[0]] + [future_assets[0]])
 
@@ -120,7 +120,11 @@ def test_equity_market_cap():
 
 def test_crypto_market_cap():
     from data_connectors.fundamentals.coingecko.crypto_fundamentals import CoinGeckoMarketCap
-    ts = CoinGeckoMarketCap(asset_list=None)
+    from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
+
+    spot_assets = AssetCurrencyPair.filter(ticker__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
+    spot_assets=[a.base_asset for a in spot_assets]
+    ts = CoinGeckoMarketCap(asset_list=spot_assets)
     ts.run(debug_mode=True, force_update=True)
 
 def test_equity_fundamentals():

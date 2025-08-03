@@ -11,7 +11,7 @@ from tqdm import tqdm
 from data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials,get_latest_market_cap_coingecko
 import json
 from data_connectors.utils import NAME_CRYPTO_MARKET_CAP
-
+import mainsequence.client as ms_client
 
 class CoinGeckoMarketCap(TimeSerie):
     """
@@ -28,27 +28,19 @@ class CoinGeckoMarketCap(TimeSerie):
         super().__init__(*args, **kwargs)
         self.asset_list = asset_list
         # If no asset_list is passed, we'll rely on the subclass to define _get_default_asset_list
-        self.use_vam_assets = False
         self.create_categories=False
         if asset_list is None:
-            self.use_vam_assets = True
             self.create_categories=True
-        else:
-            # Optional check: ensure all assets have the same venue
-            assert all(
-                [
-                    a.execution_venue.symbol == MARKETS_CONSTANTS.FIGI_COMPOSITE_EV
-                    for a in asset_list
-                ]
-            ), f"Execution Venue in all assets should be {MARKETS_CONSTANTS.FIGI_COMPOSITE_EV}"
+
 
     def dependencies(self):
         return {}
 
     def get_asset_list(self):
-        if self.asset_list is not None:
-            return self.asset_list
-        else:
+        asset_list=self.asset_list
+        if asset_list is  None:
+
+
             currency_assets = AssetCurrencyPair.filter(
                 security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
                 security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_CURNCY,
@@ -58,7 +50,14 @@ class CoinGeckoMarketCap(TimeSerie):
             self.logger.info(
                 f"{self.local_hash_id} is updating {len(asset_list)} assets"
             )
-            return asset_list
+
+        assert all(
+            [
+                a.current_snapshot.exchange_code == None
+                for a in asset_list
+            ]
+        )
+        return asset_list
 
     def update(self, update_statistics: "UpdateStatistics"):
         """
@@ -73,7 +72,7 @@ class CoinGeckoMarketCap(TimeSerie):
         provider_data_list = []
 
         for asset in tqdm(update_statistics.asset_list):
-            from_date = update_statistics.update_statistics[asset.unique_identifier]
+            from_date = update_statistics.get_last_update_index_2d(asset.unique_identifier)
 
             if from_date >= last_available_update:
                 continue
@@ -97,12 +96,21 @@ class CoinGeckoMarketCap(TimeSerie):
         provider_data = pd.concat(provider_data_list, axis=0)
         if len(provider_data) > 0:
             provider_data = provider_data.set_index(["unique_identifier"], append=True)
+            provider_data = provider_data[~provider_data.index.duplicated(keep="first")]
 
         return provider_data
 
+    def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
+        # Logic from original code for automatic VAM creation
 
+        identifier = f"coingecko_market_cap"
+        return ms_client.TableMetaData(
+            identifier=identifier,
+            description="Daily Market Cap Data From Coingecko",
+            data_frequency_id=ms_client.DataFrequency.one_d,
+        )
 
-    def _run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
+    def run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
         """
         Common post-update steps plus a call to subclass's `_register_in_backend`.
         """
