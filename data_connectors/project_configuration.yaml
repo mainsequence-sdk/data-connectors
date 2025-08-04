@@ -47,3 +47,8 @@ jobs:
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
+
+#  - name: "Asset Translation Tables"
+#    resource:
+#      notebook:
+#        path: "/scripts/create_translation_tables.py"
