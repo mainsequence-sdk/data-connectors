@@ -9,7 +9,7 @@ import databento as db
 import pandas as pd
 import pytz
 from mainsequence.client import UpdateStatistics, Asset
-from mainsequence.tdag.time_series import DataNode, List
+from mainsequence.tdag.data_nodes import DataNode, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 

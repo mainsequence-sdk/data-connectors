@@ -7,9 +7,9 @@ project_root = Path(__file__).resolve().parents[1]
 env_file_path = project_root / ".env"
 
 load_dotenv(dotenv_path=env_file_path)
-from mainsequence.tdag.time_series import TimeSerie,  APITimeSerie
+from mainsequence.tdag.data_nodes import DataNode,  APIDataNode
 import mainsequence.client as ms_client
-class TestTimeSerie(TimeSerie):
+class TestTimeSerie(DataNode):
     def __init__(self, data_source_id: str, local_hash_id: str, *args, **kwargs):
         self.bars = APITimeSerie(local_hash_id=local_hash_id, data_source_id=data_source_id)
         super().__init__(*args, **kwargs)
@@ -135,13 +135,17 @@ def test_equity_fundamentals():
 
 
 
+
+
+
 # test_api_time_series()
 # test_binance_bars_from_trades()
-# test_binance_daily_bars()
-# test_alpaca_bars()
-# test_alpaca_bars_small()
-# test_crypto_market_cap()
+test_crypto_market_cap()
 test_equity_market_cap()
+test_binance_daily_bars()
+test_alpaca_bars()
+# test_alpaca_bars_small()
+
 # test_databento_bars_small()
 # test_databento_market_cap_small()
 # test_databento_bars()

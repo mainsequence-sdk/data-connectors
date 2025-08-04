@@ -1,4 +1,4 @@
-from mainsequence.tdag.time_series import DataNode
+from mainsequence.tdag.data_nodes import DataNode
 from .utils import (   get_bars_by_date_optimized,
                     get_information_bars
                     )

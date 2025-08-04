@@ -9,7 +9,7 @@ from mainsequence.client import (
     UpdateStatistics, Asset, MarketsTimeSeriesDetails, DataFrequency,
     AssetTranslationRule, AssetFilter, MARKETS_CONSTANTS
 )
-from mainsequence.tdag.time_series import DataNode, APITimeSerie
+from mainsequence.tdag.data_nodes import DataNode, APITimeSerie
 
 from ...utils import get_stock_assets, register_rules
 

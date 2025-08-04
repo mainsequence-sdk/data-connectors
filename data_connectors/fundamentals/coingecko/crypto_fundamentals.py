@@ -2,7 +2,7 @@
 
 
 import pandas as pd
-from mainsequence.tdag.time_series import DataNode
+from mainsequence.tdag.data_nodes import DataNode
 from mainsequence.client import (UpdateStatistics, MARKETS_CONSTANTS, Asset, AssetCurrencyPair)
 from datetime import datetime, timedelta
 import pytz

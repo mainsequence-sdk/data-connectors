@@ -4,7 +4,7 @@ from typing import Union
 
 import pandas as pd
 
-from mainsequence.tdag.time_series import DataNode
+from mainsequence.tdag.data_nodes import DataNode
 from mainsequence.client import Asset, UpdateStatistics
 from mainsequence.client.models_helpers import MarketsTimeSeriesDetails, DataFrequency
 from mainsequence.client.utils import DoesNotExist
