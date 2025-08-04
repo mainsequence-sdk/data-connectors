@@ -9,17 +9,17 @@ from mainsequence.client import (
     UpdateStatistics, Asset, MarketsTimeSeriesDetails, DataFrequency,
     AssetTranslationRule, AssetFilter, MARKETS_CONSTANTS
 )
-from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
+from mainsequence.tdag.time_series import DataNode, APITimeSerie
 
 from ...utils import get_stock_assets, register_rules
 
 DATABENTO_API_KEY = os.environ.get('DATABENTO_API_KEY')
 
 
-class DatabentoMarketCap(TimeSerie):
+class DatabentoMarketCap(DataNode):
     """
     Calculates daily market cap using Databento prices and reference data.
-    It reuses an existing Databento prices TimeSerie.
+    It reuses an existing Databento prices DataNode.
     """
     OFFSET_START = datetime.datetime(2019, 1, 1, tzinfo=pytz.utc)
 

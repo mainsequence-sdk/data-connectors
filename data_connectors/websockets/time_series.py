@@ -14,7 +14,7 @@ import threading
 import time
 import os
 
-from mainsequence.tdag import TimeSerie
+from mainsequence.tdag import DataNode
 import mainsequence.client as ms_client
 from mainsequence.logconf import dump_structlog_bound_logger,load_structlog_bound_logger
 import multiprocessing as mp
@@ -101,7 +101,7 @@ def queue_health_check(queues: dict, stop_event: threading.Event,
 
 
 
-class LiveBarsTimeSeries(TimeSerie):
+class LiveBarsTimeSeries(DataNode):
 
     NUM_AGGREGATOR_WORKERS = min(4, max(1, os.cpu_count() - 1))
 

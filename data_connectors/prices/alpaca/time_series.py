@@ -1,4 +1,4 @@
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
+from mainsequence.tdag.time_series import DataNode, WrapperTimeSerie
 from mainsequence.client import UpdateStatistics, AssetCurrencyPair, Asset, DataFrequency, MARKETS_CONSTANTS
 
 import mainsequence.client as ms_client
@@ -46,7 +46,7 @@ import requests
 # }
 # response = requests.get(url, headers=headers)
 
-class AlpacaEquityBars(TimeSerie):
+class AlpacaEquityBars(DataNode):
     """
   Fetches historical market data (bars) for stocks and cryptocurrencies from the Alpaca API.
 

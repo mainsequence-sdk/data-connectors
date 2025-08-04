@@ -1,4 +1,4 @@
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.time_series import DataNode
 from .utils import (   get_bars_by_date_optimized,
                     get_information_bars
                     )
@@ -110,7 +110,7 @@ logger = logging.getLogger(__name__)
 class NoDataInURL(Exception):
     pass
 
-class BaseBinanceEndpoint(TimeSerie):
+class BaseBinanceEndpoint(DataNode):
     """Base class for fetching historical data from Binance."""
     OFFSET_START = datetime.datetime(2017, 1, 1, tzinfo=pytz.utc)
 
@@ -315,7 +315,7 @@ class BaseBinanceEndpoint(TimeSerie):
 
 class BinanceHistoricalBars(BaseBinanceEndpoint):
     """
-    TimeSerie for fetching aggregated bars directly from the Binance API.
+    DataNode for fetching aggregated bars directly from the Binance API.
     """
     BATCH_UPDATE_DAYS = 30 * 12 * 8
     LAST_AVAILABLE_DAYS = 1
@@ -534,7 +534,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
 
 class BinanceBarsFromTrades(BaseBinanceEndpoint):
     """
-    TimeSerie for fetching raw trades from Binance and aggregating them into 1-minute bars.
+    DataNode for fetching raw trades from Binance and aggregating them into 1-minute bars.
     """
     BATCH_UPDATE_DAYS = 365
     LAST_AVAILABLE_DAYS = 1
