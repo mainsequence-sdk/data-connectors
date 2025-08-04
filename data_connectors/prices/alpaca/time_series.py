@@ -1,4 +1,3 @@
-from mainsequence.tdag.data_nodes import DataNode, WrapperTimeSerie
 from mainsequence.client import UpdateStatistics, AssetCurrencyPair, Asset, DataFrequency, MARKETS_CONSTANTS
 
 import mainsequence.client as ms_client
@@ -19,6 +18,8 @@ import pytz
 import datetime
 import pandas as pd
 import gc
+
+from mainsequence.tdag import DataNode
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import traceback
