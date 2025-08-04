@@ -19,6 +19,8 @@ import pytz
 import datetime
 import pandas as pd
 import gc
+
+from mainsequence.tdag import DataNode
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import traceback

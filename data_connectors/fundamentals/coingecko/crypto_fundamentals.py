@@ -48,7 +48,7 @@ class CoinGeckoMarketCap(DataNode):
             )
             asset_list = [a.base_asset for a in currency_assets]
             self.logger.info(
-                f"{self.local_hash_id} is updating {len(asset_list)} assets"
+                f"{self.local_time_serie.update_hash} is updating {len(asset_list)} assets"
             )
 
         assert all(
