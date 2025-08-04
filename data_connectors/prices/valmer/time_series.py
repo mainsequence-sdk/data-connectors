@@ -4,7 +4,7 @@ from typing import Union
 
 import pandas as pd
 
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.time_series import DataNode
 from mainsequence.client import Asset, UpdateStatistics
 from mainsequence.client.models_helpers import MarketsTimeSeriesDetails, DataFrequency
 from mainsequence.client.utils import DoesNotExist
@@ -14,7 +14,7 @@ import numpy as np
 import pandas.api.types as ptypes
 
 
-class ImportValmer(TimeSerie):
+class ImportValmer(DataNode):
 
 
     def __init__(

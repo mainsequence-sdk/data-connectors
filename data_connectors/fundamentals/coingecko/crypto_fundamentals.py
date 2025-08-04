@@ -2,7 +2,7 @@
 
 
 import pandas as pd
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.time_series import DataNode
 from mainsequence.client import (UpdateStatistics, MARKETS_CONSTANTS, Asset, AssetCurrencyPair)
 from datetime import datetime, timedelta
 import pytz
@@ -13,7 +13,7 @@ import json
 from data_connectors.utils import NAME_CRYPTO_MARKET_CAP
 import mainsequence.client as ms_client
 
-class CoinGeckoMarketCap(TimeSerie):
+class CoinGeckoMarketCap(DataNode):
     """
     Gets latest MarketCap data. If no Market Data is available, gets the data since 1.1.2017.
     """

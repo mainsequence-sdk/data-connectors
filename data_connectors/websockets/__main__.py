@@ -79,7 +79,7 @@ def start_crawler(price_source:str,config: dict):
                           bar_configuration=bar_configuration,
                           )
 
-    #force the creation of the TimeSerie
+    #force the creation of the DataNode
     ts.verify_and_build_remote_objects()
     #set table metadata
     if ts.metadata.sourcetableconfiguration is None:

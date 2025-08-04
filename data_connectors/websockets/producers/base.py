@@ -6,7 +6,7 @@ import datetime
 import ccxt.pro
 import logging
 from abc import ABC, abstractmethod
-from mainsequence.tdag import TimeSerie
+from mainsequence.tdag import DataNode
 
 
 

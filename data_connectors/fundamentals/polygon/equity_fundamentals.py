@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.time_series import DataNode
 from mainsequence.client import (UpdateStatistics, MARKETS_CONSTANTS,Asset)
 from datetime import datetime, timedelta
 import pytz
@@ -13,7 +13,7 @@ from data_connectors.utils import NAME_ALPACA_MARKET_CAP, get_stock_assets
 from mainsequence.client import  DataFrequency, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
 import mainsequence.client as ms_client
 
-class PolygonBaseTimeSeries(TimeSerie):
+class PolygonBaseTimeSeries(DataNode):
     """
     Base class that contains the common logic for both daily market cap and fundamentals.
 
