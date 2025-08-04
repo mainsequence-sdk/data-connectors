@@ -125,9 +125,9 @@ class CoinGeckoMarketCap(TimeSerie):
         from mainsequence.client.models_vam import  AssetCategory
 
         #updater category from last_obsevation
-        last_observation = self.get_last_observation()
+        last_observation = self.get_ranged_data_per_asset(range_descriptor=update_statistics.get_update_range_map_great_or_equal())
 
-        if last_observation is not None:
+        if last_observation.empty==False:
             last_date = last_observation.index[0][0]
             last_observation = last_observation["market_cap"].sort_values(ascending=False)
             last_observation = last_observation.iloc[:100]
