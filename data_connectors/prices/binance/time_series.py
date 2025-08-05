@@ -190,19 +190,19 @@ class BaseBinanceEndpoint(DataNode):
         url = f"{root_url}{binance_symbol}/{file_root}.zip"
         return url, file_root
 
-    def update(self, update_statistics: ms_client.UpdateStatistics) -> pd.DataFrame:
+    def update(self,) -> pd.DataFrame:
         """Main update orchestrator."""
         if not self.info_map:
-            self._init_info_map(update_statistics.asset_list)
+            self._init_info_map(self.update_statistics.asset_list)
 
         # 1. Get active assets and their historical start dates
-        active_uids, start_date_map = self._get_active_assets_and_start_dates(update_statistics)
+        active_uids, start_date_map = self._get_active_assets_and_start_dates(self.update_statistics)
         if not active_uids:
             logger.warning("No active assets found to update.")
             return pd.DataFrame()
 
         # 2. Calculate the required update range for each asset
-        update_ranges = self._calculate_update_ranges(update_statistics, start_date_map)
+        update_ranges = self._calculate_update_ranges(self.update_statistics, start_date_map)
 
         # 3. Fetch data in parallel
         all_bars = self._run_parallel_fetch(update_ranges)
@@ -211,7 +211,7 @@ class BaseBinanceEndpoint(DataNode):
 
         return all_bars
 
-    def _get_active_assets_and_start_dates(self, update_statistics) -> Tuple[List[str], Dict[str, datetime.date]]:
+    def _get_active_assets_and_start_dates(self) -> Tuple[List[str], Dict[str, datetime.date]]:
         """Filters for tradable assets and finds their inception date on Binance."""
 
         futures_status = fetch_futures_symbols_dict()
@@ -220,7 +220,7 @@ class BaseBinanceEndpoint(DataNode):
         active_uids = []
         start_date_map = {}
 
-        for asset in tqdm(update_statistics.asset_list, desc="Checking asset status"):
+        for asset in tqdm(self.update_statistics.asset_list, desc="Checking asset status"):
             uid = asset.unique_identifier
             info = self.info_map.get(uid)
             if not info:
@@ -293,7 +293,7 @@ class BaseBinanceEndpoint(DataNode):
         """
         raise NotImplementedError
 
-    def run_post_update_routines(self, error_on_last_update: bool, update_statistics: ms_client.UpdateStatistics):
+    def run_post_update_routines(self, error_on_last_update: bool):
         """Common post-update routines for all Binance TimeSeries."""
         if self.metadata is None:
             return
@@ -328,7 +328,7 @@ class BinanceHistoricalBars(BaseBinanceEndpoint):
         super().__init__(*args, **kwargs        )
         assert isinstance(self.bar_configuration, TimeBarConfig)
 
-    def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
+    def get_table_metadata(self) -> Optional[ms_client.TableMetaData]:
         if self.bar_configuration.frequency_id != "1m":
             identifier = f"binance_{self.bar_configuration.frequency_id}_bars"
             return ms_client.TableMetaData(
