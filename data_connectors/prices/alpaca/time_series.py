@@ -309,7 +309,7 @@ class AlpacaEquityBars(DataNode):
 
         return bars_request_df
 
-    def update(self, update_statistics: UpdateStatistics):
+    def update(self,):
         """
            [Core Logic] Fetches new bar data from the Alpaca API.
 
@@ -324,7 +324,7 @@ class AlpacaEquityBars(DataNode):
 
         calendars = {str(cal): mcal.get_calendar(cal.replace("ARCA", "XNYS").replace("AMEX", "XNYS")) for cal in
                      np.unique(list(self.asset_calendar_map.values()))}
-        bars_request_df = self._fetch_data_concurrently(update_statistics,calendars=calendars)
+        bars_request_df = self._fetch_data_concurrently(self.update_statistics,calendars=calendars)
         if bars_request_df.empty:
             self.logger.info("No new bars were returned from the API.")
             return pd.DataFrame()
@@ -334,7 +334,7 @@ class AlpacaEquityBars(DataNode):
         return bars_request_df
 
 
-    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
+    def get_table_metadata(self)->ms_client.TableMetaData:
         TS_ID = f"alpaca_{self.frequency_id}_bars"
         meta = ms_client.TableMetaData(
             identifier=TS_ID,
@@ -344,7 +344,7 @@ class AlpacaEquityBars(DataNode):
 
         return meta
 
-    def run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
+    def run_post_update_routines(self, error_on_last_update):
         super().run_after_post_init_routines()
 
         if self.metadata is None:

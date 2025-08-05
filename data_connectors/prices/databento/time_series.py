@@ -98,7 +98,7 @@ class DatabentoHistoricalBars(DataNode):
             self.logger.error(f"Error fetching data for {asset.ticker} from Databento: {e}")
             return None
 
-    def update(self, update_statistics: "UpdateStatistics"):
+    def update(self):
         """
         Fetches updates for all assets in parallel.
         """
@@ -108,20 +108,20 @@ class DatabentoHistoricalBars(DataNode):
                                                                        microsecond=0) - datetime.timedelta(minutes=1)
 
         # check which assets need to be updated
-        if update_statistics.is_empty():
+        if self.update_statistics.is_empty():
             calendar_max_closes = {}
             for cal_name, cal in calendars.items():
                 full_schedule = cal.schedule(last_available_value-datetime.timedelta(days=7), last_available_value) #cal.schedule(*min_max)
                 calendar_max_closes[cal_name] = full_schedule.iloc[-1]["market_close"]
 
-            min_max = [update_statistics.get_min_latest_value(), datetime.datetime.now(pytz.utc).replace(hour=0, minute=0, second=0,)]
+            min_max = [self.update_statistics.get_min_latest_value(), datetime.datetime.now(pytz.utc).replace(hour=0, minute=0, second=0,)]
             for cal_name, cal in calendars.items():
                 full_schedule = cal.schedule(*min_max)
                 calendar_max_closes[cal_name] = full_schedule.iloc[-1]["market_close"]
 
             asset_identifier_to_update = []
-            for a in update_statistics.asset_list:
-                if update_statistics[a.unique_identifier] < calendar_max_closes[self.asset_calendar_map[a.unique_identifier]]:
+            for a in self.update_statistics.asset_list:
+                if self.update_statistics[a.unique_identifier] < calendar_max_closes[self.asset_calendar_map[a.unique_identifier]]:
                     asset_identifier_to_update.append(a.unique_identifier)
                     continue
 
@@ -129,7 +129,7 @@ class DatabentoHistoricalBars(DataNode):
                 self.logger.info(f"Nothing to update, prices not yet available in calendars {calendar_max_closes.keys()}")
                 return pd.DataFrame()
 
-            update_statistics = update_statistics.update_assets(update_statistics.asset_list)
+            update_statistics = self.update_statistics.update_assets(self.update_statistics.asset_list)
 
         max_skip = update_statistics.get_max_latest_value(init_fallback_date=self.OFFSET_START) + datetime.timedelta(days=360)
         if max_skip < datetime.datetime.now(pytz.utc):

@@ -93,7 +93,7 @@ class ImportValmer(DataNode):
                             ]
         return columns_metadata
 
-    def update(self, update_statistics: "UpdateStatistics"):
+    def update(self):
         source_data = self.source_data
 
         assert source_data is not None, "Source data is not available"
@@ -107,13 +107,13 @@ class ImportValmer(DataNode):
 
         source_data.set_index(["time_index", "unique_identifier"], inplace=True)
 
-        source_data = update_statistics.filter_df_by_latest_value(source_data)
+        source_data = self.update_statistics.filter_df_by_latest_value(source_data)
 
         self._set_column_metadata()
         return source_data
 
 
-    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
+    def get_table_metadata(self)->ms_client.TableMetaData:
         """
 
         """

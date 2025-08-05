@@ -65,7 +65,7 @@ class PolygonBaseTimeSeries(DataNode):
         """
         raise NotImplementedError("Subclass must implement data‐fetching logic.")
 
-    def update(self, update_statistics: "UpdateStatistics"):
+    def update(self):
         """
         Generic update that loops over assets, figures out from_date, calls
         the specialized _get_provider_data(...) and returns a DataFrame.
@@ -77,8 +77,8 @@ class PolygonBaseTimeSeries(DataNode):
         )
         provider_data_list = []
 
-        for asset in tqdm(update_statistics.asset_list):
-            from_date = update_statistics.get_last_update_index_2d(asset.unique_identifier)
+        for asset in tqdm(self.update_statistics.asset_list):
+            from_date = self.update_statistics.get_last_update_index_2d(asset.unique_identifier)
 
             if from_date >= last_available_update:
                 continue
@@ -110,7 +110,7 @@ class PolygonBaseTimeSeries(DataNode):
 
 
 
-    def  run_post_update_routines(self, error_on_last_update,update_statistics:UpdateStatistics):
+    def  run_post_update_routines(self, error_on_last_update,):
         """
         Common post-update steps plus a call to subclass's `_register_in_backend`.
         """
@@ -153,7 +153,7 @@ class PolygonDailyMarketCap(PolygonBaseTimeSeries):
         )
 
 
-    def get_table_metadata(self, update_statistics) -> Optional[ms_client.TableMetaData]:
+    def get_table_metadata(self) -> Optional[ms_client.TableMetaData]:
         # Logic from original code for automatic VAM creation
 
         identifier = f"polygon_historical_marketcap"

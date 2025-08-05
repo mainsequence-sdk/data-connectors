@@ -64,7 +64,7 @@ class DatabentoMarketCap(DataNode):
             self.asset_list = get_stock_assets()
         return self.asset_list
 
-    def update(self, update_statistics: "UpdateStatistics"):
+    def update(self,):
         """
         Calculates market cap on a per-asset basis. For each asset, it fetches new price data
         and then queries for shares outstanding only over the time period for which new prices were found.
@@ -75,9 +75,9 @@ class DatabentoMarketCap(DataNode):
 
         all_market_caps = []
 
-        for asset in update_statistics.asset_list:
+        for asset in self.update_statistics.asset_list:
             unique_identifier = asset.unique_identifier
-            from_date = update_statistics[unique_identifier]
+            from_date = self.update_statistics[unique_identifier]
 
             to_date = datetime.datetime.now(pytz.utc)
 
@@ -146,7 +146,7 @@ class DatabentoMarketCap(DataNode):
 
         return final_df
 
-    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: "UpdateStatistics"):
+    def _run_post_update_routines(self, error_on_last_update: bool):
         if error_on_last_update:
             self.logger.warning("Do not register data source due to error during run")
             return

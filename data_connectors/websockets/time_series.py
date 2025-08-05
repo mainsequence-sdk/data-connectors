@@ -122,7 +122,7 @@ class LiveBarsTimeSeries(DataNode):
     def set_producer_class(self,producer_class:ProducerBase):
         self.ProducerClass=producer_class
 
-    def get_table_metadata(self, update_statistics) -> ms_client.TableMetaData:
+    def get_table_metadata(self) -> ms_client.TableMetaData:
         """
 
         """
