@@ -113,12 +113,11 @@ class NoDataInURL(Exception):
 class BaseBinanceEndpoint(DataNode):
     """Base class for fetching historical data from Binance."""
     OFFSET_START = datetime.datetime(2017, 1, 1, tzinfo=pytz.utc)
-
+    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_list","asset_category_identifier"]
     def __init__(
             self,
             asset_list: Optional[List[Asset]],
             bar_configuration: BarConfiguration,
-            local_kwargs_to_ignore: List[str] = ["asset_list","asset_category_identifier"],
             asset_category_identifier: Optional[str] = None,
             *args,
             **kwargs

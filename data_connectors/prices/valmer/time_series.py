@@ -15,7 +15,7 @@ import pandas.api.types as ptypes
 
 
 class ImportValmer(DataNode):
-
+    _ARGS_IGNORE_IN_STORAGE_HASH=["artifact_name","bucket_name"]
 
     def __init__(
             self,
@@ -135,7 +135,6 @@ if __name__ == "__main__":
     ts = ImportValmer(
         bucket_name="Vector de precios",
         artifact_name="Vector_20250430.csv",
-        local_kwargs_to_ignore=["bucket_name", "artifact_name"]
     )
 
     ts.run(

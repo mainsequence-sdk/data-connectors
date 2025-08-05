@@ -22,12 +22,11 @@ class DatabentoMarketCap(DataNode):
     It reuses an existing Databento prices DataNode.
     """
     OFFSET_START = datetime.datetime(2019, 1, 1, tzinfo=pytz.utc)
-
+    _ARGS_IGNORE_STORAGE_HASH=["asset_list"]
     def __init__(self,
                  asset_list: Optional[List],
                  prices_time_serie_unique_identifier: str,
                  dataset: str,
-                 local_kwargs_to_ignore: List[str] = ["asset_list"],
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 

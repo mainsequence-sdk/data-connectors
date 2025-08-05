@@ -104,11 +104,10 @@ def queue_health_check(queues: dict, stop_event: threading.Event,
 class LiveBarsTimeSeries(DataNode):
 
     NUM_AGGREGATOR_WORKERS = min(4, max(1, os.cpu_count() - 1))
-
+    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_list"]
     def __init__(self ,prices_source :str,
                  asset_list :List[ms_client.AssetMixin],
                  bar_configuration :BarConfiguration,
-                 local_kwargs_to_ignore=["asset_list"],
                  *args, **kwargs):
 
         self.prices_source = prices_source

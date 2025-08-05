@@ -69,9 +69,9 @@ class AlpacaEquityBars(DataNode):
         "w": TimeFrameUnit.Week,
         "mo": TimeFrameUnit.Month,
     }
-
+    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_list"]
     def __init__(self, asset_list: Optional[List], frequency_id: str,
-                 adjustment: str, local_kwargs_to_ignore: List[str] = ["asset_list"], *args, **kwargs):
+                 adjustment: str, *args, **kwargs):
         """
 
         Args:
@@ -81,8 +81,7 @@ class AlpacaEquityBars(DataNode):
                       (e.g., '1m', '15m', '1h', '1d').
         adjustment: The type of price adjustment for equity bars. Defaults to "raw".
                     See Alpaca's documentation for options like 'split', 'dividend'.
-        local_kwargs_to_ignore: Arguments to exclude from the local hash, allowing multiple
-                                instances to share the same remote data table.
+
         """
         if frequency_id not in {freq.value for freq in DataFrequency}:
             raise AssertionError(f"Invalid frequency_id: {frequency_id}")

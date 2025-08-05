@@ -31,9 +31,9 @@ class DatabentoHistoricalBars(DataNode):
     }
     # Databento misses earlier data
     OFFSET_START = datetime.datetime(2019, 1, 1, tzinfo=pytz.utc)
-
+    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_list"]
     def __init__(self, asset_list: Optional[List], frequency_id: str,
-                 dataset: str, local_kwargs_to_ignore: List[str] = ["asset_list"],
+                 dataset: str,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 

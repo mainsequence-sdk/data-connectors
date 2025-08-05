@@ -27,11 +27,10 @@ class PolygonBaseTimeSeries(DataNode):
     - _get_default_asset_list(self) -> List
       (if the default set of assets to filter is different in each child class)
     """
-
+    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_universe"]
     def __init__(
         self,
         asset_list: Optional[List] = None,
-        local_kwargs_to_ignore: List[str] = ["asset_universe"],
         *args,
         **kwargs
     ):

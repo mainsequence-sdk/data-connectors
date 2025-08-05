@@ -17,11 +17,10 @@ class CoinGeckoMarketCap(DataNode):
     """
     Gets latest MarketCap data. If no Market Data is available, gets the data since 1.1.2017.
     """
-
+    _ARGS_IGNORE_STORAGE_HASH=["asset_universe"]
     def __init__(
             self,
             asset_list: Optional[List] = None,
-            local_kwargs_to_ignore: List[str] = ["asset_universe"],
             *args,
             **kwargs
     ):
