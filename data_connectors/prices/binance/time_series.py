@@ -151,11 +151,14 @@ class BaseBinanceEndpoint(DataNode):
         info_map = {}
         for asset in asset_list:
             # Correctly determine the symbol based on security type
+            currency_asset=asset
             if asset.security_type == CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
-                binance_symbol = asset.currency_pair.current_snapshot.ticker
+                currency_asset=asset.currency_pair
+
                 assert asset.maturity_code == "PERPETUAL"
-            else:  # Assumes spot otherwise
-                binance_symbol = f"{asset.base_asset.current_snapshot.ticker}{asset.quote_asset.current_snapshot.ticker}"
+
+
+            binance_symbol = f"{currency_asset.base_asset.current_snapshot.ticker}{currency_asset.quote_asset.current_snapshot.ticker}"
 
             info_map[asset.unique_identifier] = {
                 "binance_symbol": binance_symbol,
@@ -205,7 +208,7 @@ class BaseBinanceEndpoint(DataNode):
             self._init_info_map(self.update_statistics.asset_list)
 
         # 1. Get active assets and their historical start dates
-        active_uids, start_date_map = self._get_active_assets_and_start_dates(self.update_statistics)
+        active_uids, start_date_map = self._get_active_assets_and_start_dates()
         if not active_uids:
             logger.warning("No active assets found to update.")
             return pd.DataFrame()
