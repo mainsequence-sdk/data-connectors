@@ -14,6 +14,12 @@ if __name__ == "__main__":
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
         ),
+        AssetTranslationRule(
+            asset_filter=AssetFilter(
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
+            ),
+            markets_time_serie_unique_identifier=markets_time_series_identifier,
+        )
     ]
     register_rules(
         translation_table_identifier,
