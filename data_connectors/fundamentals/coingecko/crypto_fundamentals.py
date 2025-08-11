@@ -149,4 +149,8 @@ class CoinGeckoMarketCap(DataNode):
                     print(f"Created Categories: Crypto: {crypto_category}")
                 else:
                     crypto_category = crypto_category[0]
-                crypto_category.patch(assets=subset["asset_id"].to_list())
+
+                try:
+                    crypto_category.patch(assets=subset["asset_id"].to_list())
+                except Exception as e:
+                    self.logger.exception(e)
