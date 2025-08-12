@@ -69,7 +69,7 @@ class AlpacaEquityBars(DataNode):
         "w": TimeFrameUnit.Week,
         "mo": TimeFrameUnit.Month,
     }
-    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_list"]
+    _ARGS_IGNORE_IN_STORAGE_HASH = ["asset_list"]
     def __init__(self, asset_list: Optional[List], frequency_id: str,
                  adjustment: str, *args, **kwargs):
         """
@@ -308,7 +308,7 @@ class AlpacaEquityBars(DataNode):
 
         return bars_request_df
 
-    def update(self,):
+    def update(self):
         """
            [Core Logic] Fetches new bar data from the Alpaca API.
 
@@ -319,11 +319,10 @@ class AlpacaEquityBars(DataNode):
               for the respective exchange calendar.
            4. For minute/hour bars, it calculates the closing timestamp based on the bar's open time.
            5. Formats the combined data into a final DataFrame ready for persistence.
-           """
-
+        """
         calendars = {str(cal): mcal.get_calendar(cal.replace("ARCA", "XNYS").replace("AMEX", "XNYS")) for cal in
                      np.unique(list(self.asset_calendar_map.values()))}
-        bars_request_df = self._fetch_data_concurrently(self.update_statistics,calendars=calendars)
+        bars_request_df = self._fetch_data_concurrently(self.update_statistics, calendars=calendars)
         if bars_request_df.empty:
             self.logger.info("No new bars were returned from the API.")
             return pd.DataFrame()

@@ -2,7 +2,8 @@ from mainsequence.client import AssetTranslationRule, AssetFilter, MARKETS_CONST
 
 from data_connectors.utils import register_rules
 
-if __name__ == "__main__":
+
+def create_asset_translation_table():
 
     # --- ALPACA ---
     translation_table_identifier = f"prices_translation_table_1d"
@@ -83,3 +84,7 @@ if __name__ == "__main__":
         translation_table_identifier,
         rules,
     )
+
+
+if __name__ == "__main__":
+    create_asset_translation_table()
