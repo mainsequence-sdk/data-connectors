@@ -139,8 +139,12 @@ def test_equity_fundamentals():
     ts = PolygonQFundamentals(asset_list=asset_list)
     ts.run(debug_mode=True, force_update=True)
 
+def test_banxico_mbonos():
+    from data_connectors.prices.banxico.data_nodes import BanxicoMXNOTR
+    import os
 
-
+    ts=BanxicoMXNOTR()
+    ts.run(debug_mode=True, force_update=True)
 
 
 
@@ -148,10 +152,10 @@ def test_equity_fundamentals():
 # test_binance_bars_from_trades()
 # test_crypto_market_cap()
 # test_equity_market_cap()
-test_binance_daily_bars()
+# test_binance_daily_bars()
 # test_alpaca_bars()
 # test_alpaca_bars_small()
-
+test_banxico_mbonos()
 # test_databento_bars_small()
 # test_databento_market_cap_small()
 # test_databento_bars()
