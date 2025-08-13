@@ -131,9 +131,20 @@ class CoinGeckoMarketCap(DataNode):
             last_observation = last_observation["market_cap"].sort_values(ascending=False)
             last_observation = last_observation.iloc[:100]
             all_assets = Asset.filter(unique_identifier__in=last_observation.index.get_level_values("unique_identifier").to_list())
-            asset_map = {a.unique_identifier: a.id for a in all_assets}
+            all_assets_ids = [a.id for a in all_assets]
+
+            bnce_usdt_pairs = AssetCurrencyPair.filter(
+                base_asset__id__in=all_assets_ids,
+                quote_asset__current_snapshot__ticker='USDT',
+                current_snapshot__exchange_code='BNCE',
+                security_type_2='SPOT'
+            )
+            base_to_pair_map = {pair.base_asset.unique_identifier: pair.id for pair in bnce_usdt_pairs}
+
             last_observation = last_observation.reset_index()
-            last_observation["asset_id"] = last_observation["unique_identifier"].map(asset_map).astype(int)
+            last_observation["currency_pair_id"] = last_observation["unique_identifier"].map(base_to_pair_map)
+            last_observation.dropna(subset=['currency_pair_id'], inplace=True)
+            last_observation["currency_pair_id"] = last_observation["currency_pair_id"].astype(int)
             for i in [10, 50, 100]:
                 subset = last_observation.iloc[:i]
 
@@ -144,13 +155,13 @@ class CoinGeckoMarketCap(DataNode):
                         display_name=name,
                         source="coingecko",
                         description=f"This category contains the top {i} cryptos by market cap as of {last_date}",
-                        unique_id=name.replace(" ","_").lower(),
+                        unique_id=name.replace(" ", "_").lower(),
                     )
                     print(f"Created Categories: Crypto: {crypto_category}")
                 else:
                     crypto_category = crypto_category[0]
 
                 try:
-                    crypto_category.patch(assets=subset["asset_id"].to_list())
+                    crypto_category.patch(assets=subset["currency_pair_id"].to_list())
                 except Exception as e:
                     self.logger.exception(e)
