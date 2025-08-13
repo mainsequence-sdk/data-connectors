@@ -169,19 +169,15 @@ class BaseBinanceEndpoint(DataNode):
         if self.asset_list is None:
             # get them through main sequence figi class and exchange
             target_category = ms_client.AssetCategory.get(unique_identifier=self.asset_category_identifier)
-            quote_asset=Asset.get(ticker='USDT',
-                                  security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_CURNCY,
-                                  security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO
-                                  )
-            spot_assets=AssetCurrencyPair.filter(base_asset__id__in=target_category.assets,
-                                                 current_snapshot__exchange_code=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                                                 quote_asset__id=quote_asset.id)
-            future_assets=AssetFutureUSDM.filter(currency_pair__id__in=[a.id for a in spot_assets],
-                                                 current_snapshot__exchange_code=MARKETS_CONSTANTS.BINANCE_FUTURES_EV_SYMBOL,
-                                                 )
+
+            spot_assets = AssetCurrencyPair.filter(id__in=target_category.assets)
+            future_assets = AssetFutureUSDM.filter(
+                currency_pair__id__in=[a.id for a in spot_assets],
+                current_snapshot__exchange_code=MARKETS_CONSTANTS.BINANCE_FUTURES_EV_SYMBOL,
+            )
             # return binance_futures+binance_currency_pairs
             self.logger.warning("Only using currency pair for now due to timeouts in updating - add futures later")
-            return spot_assets+future_assets
+            return spot_assets + future_assets
 
         return self.asset_list
 
