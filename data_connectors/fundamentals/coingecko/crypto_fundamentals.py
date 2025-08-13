@@ -126,7 +126,8 @@ class CoinGeckoMarketCap(DataNode):
         #updater category from last_obsevation
         last_observation = self.get_ranged_data_per_asset(range_descriptor=self.update_statistics.get_update_range_map_great_or_equal())
 
-        if last_observation.empty==False:
+        if last_observation.empty == False:
+            last_observation = last_observation.groupby("unique_identifier").last()
             last_date = last_observation.index[0][0]
             last_observation = last_observation["market_cap"].sort_values(ascending=False)
             last_observation = last_observation.iloc[:100]
