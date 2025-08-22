@@ -26,6 +26,7 @@ NAME_ALPACA_MARKET_CAP = {
 
 SP500_CATEGORY_NAME = "S&P500 Constitutents"
 MAG_7_CATEGORY_NAME = "MAGNIFICENT 7"
+ETF_CATEGORY_NAME = "ETFs"
 MAG_7_CATEGORY_SYMBOLS = ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NVDA', 'TSLA']
 
 
@@ -79,7 +80,6 @@ def has_sufficient_memory(threshold_fraction=0.6) -> bool:
 def get_stock_assets(inlcude_etfs=True):
     unique_identifier = SP500_CATEGORY_NAME.lower().replace(" ", "_")
     sp500_cat = AssetCategory.get_or_none(unique_identifier=unique_identifier)
-
     mag_7_cat = AssetCategory.get_or_none(unique_identifier=MAG_7_CATEGORY_NAME.lower().replace(" ", "_"))
 
     if sp500_cat is None:
@@ -124,18 +124,27 @@ def get_stock_assets(inlcude_etfs=True):
         security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
     )
 
-    assets_etfs=[]
+    assets_etfs = []
     if inlcude_etfs:
-        assets_etfs=Asset.filter(
+        assets_etfs = Asset.filter(
             ticker__in=ETFS_MAIN_TICKERS,
             exchange_code="US",
             security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
             security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_EQUITY,
         )
+        etf_cat = AssetCategory.get_or_none(unique_identifier=ETF_CATEGORY_NAME.lower().replace(" ", "_"))
+        if etf_cat is None:
+            etf_cat = AssetCategory.create(
+                display_name=ETF_CATEGORY_NAME,
+                source="mainsequence",
+                description="Collection of ETFs",
+                unique_identifier=ETF_CATEGORY_NAME.lower().replace(" ", "_"),
+            )
+        etf_cat.patch(assets=[a.id for a in assets_etfs])
 
-    assets=equity_assets+reit_assets
+    assets = equity_assets + reit_assets
     sp500_cat.patch(assets=[a.id for a in assets])
-    return assets+assets_etfs
+    return assets + assets_etfs
 
 def register_rules(
     translation_table_identifier,
