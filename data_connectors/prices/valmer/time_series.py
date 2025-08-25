@@ -106,6 +106,17 @@ class ImportValmer(DataNode):
         for col in source_data.columns:
             source_data.rename(columns={col: col.lower()}, inplace=True)
 
+        price_series = source_data['preciosucio']
+
+        # Map to OHLC columns
+        source_data['open'] = price_series
+        source_data['close'] = price_series
+        source_data['high'] = price_series
+        source_data['low'] = price_series
+        source_data['volume'] = 0 # TODO placeholder
+        source_data['open_time'] = source_data['time_index']
+        source_data['open_time'] = source_data['open_time'].astype(np.int64)
+
         source_data.set_index(["time_index", "unique_identifier"], inplace=True)
 
         source_data = self.update_statistics.filter_df_by_latest_value(source_data)
