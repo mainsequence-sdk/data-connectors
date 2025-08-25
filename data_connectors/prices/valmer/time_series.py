@@ -1,13 +1,13 @@
 from mainsequence.client.models_tdag import Artifact
 from datetime import timedelta
-from typing import Union
+from typing import Union, Dict
 
 import pandas as pd
 
-from mainsequence.tdag.data_nodes import DataNode
-from mainsequence.client import Asset, UpdateStatistics
-from mainsequence.client.models_helpers import MarketsTimeSeriesDetails, DataFrequency
+from mainsequence.client import Asset
 from mainsequence.client.utils import DoesNotExist
+from mainsequence.tdag import DataNode
+import mainsequence.client as msc
 
 from mainsequence.virtualfundbuilder.utils import TIMEDELTA
 import numpy as np
@@ -15,8 +15,6 @@ import pandas.api.types as ptypes
 
 
 class ImportValmer(DataNode):
-    _ARGS_IGNORE_IN_STORAGE_HASH=["artifact_name","bucket_name"]
-
     def __init__(
             self,
             artifact_name: str,
@@ -28,8 +26,16 @@ class ImportValmer(DataNode):
         self.artifact_data = None
         super().__init__(*args, **kwargs)
 
-    def dependencies(self):
-        return {}
+    _ARGS_IGNORE_IN_STORAGE_HASH = ["bucket_name", "artifact_name"]
+
+    def maximum_forward_fill(self):
+        return timedelta(days=1) - TIMEDELTA
+
+    def get_explanation(self):
+        explanation = (
+            "### Data From Valmer\n\n"
+        )
+        return explanation
 
     def _get_artifact_data(self):
         if self.artifact_data is None:
@@ -38,37 +44,32 @@ class ImportValmer(DataNode):
 
         return self.artifact_data
 
-    def _get_asset_list(self) -> Union[None, list]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        return {}
+
+    def get_asset_list(self) -> Union[None, list]:
         source_data = self._get_artifact_data()
 
-        asset_columns = ["ticker", "name", "isin", "security_type", "security_type_2", "security_market_sector",
-                         "exchange_code"]
-        # buld register
-        source_data['ticker'] = source_data["Instrumento"]
-        source_data['name'] = source_data["Instrumento"]
+        asset_columns = ["unique_identifier", "isin"]
+        source_data['unique_identifier'] = source_data["Instrumento"]
         source_data['isin'] = source_data['Isin'].apply(lambda x: None if pd.isna(x) else x)
-        source_data['security_type'] = None
-        source_data['security_type_2'] = None
-        source_data['security_market_sector'] = None
-        source_data['exchange_code'] = None
-        bulk_data = source_data[asset_columns].to_dict('records')
-
+        source_data = source_data.drop(columns="Isin")
         assets = []
-        batch_size = 500
-        for i in range(0, len(bulk_data), batch_size):
-            self.logger.info(f"Batch register assets {i} to {i + batch_size} / {len(bulk_data)}")
-            batch = bulk_data[i:i + batch_size]
-            asset_ids_batch = Asset.batch_get_or_register_custom_assets(asset_list=batch)
-            self.logger.info(f"Query assets {i} to {i + batch_size} / {len(bulk_data)}")
-            bulk_assets = Asset.filter(id__in=asset_ids_batch, timeout=60 * 5)
-            assets += bulk_assets
 
-        ticker_map = {
-            a.ticker: a.unique_identifier for a in assets
-        }
+        # insert assets (takes a long time) TODO implement batch update
+        # data = source_data[asset_columns].to_dict('records')
+        # for i, asset_data in enumerate(data):
+        #     if i % 500 == 0:
+        #         self.logger.info(f"Registered {i} assets out of {len(data)}")
+        #     snapshot = dict(name=asset_data["unique_identifier"], ticker=asset_data["unique_identifier"])
+        #     asset = msc.Asset.get_or_register_custom_asset(unique_identifier=asset_data["unique_identifier"], snapshot=snapshot, isin=asset_data["isin"])
+        #     assets.append(asset)
 
-        source_data["unique_identifier"] = source_data["ticker"].map(ticker_map)
-        self.source_data = source_data.drop(columns=asset_columns)
+        for i in range(0, len(source_data), 500):
+            assets_batch = Asset.filter(unique_identifier__in=source_data["unique_identifier"].iloc[i:i+500].to_list())
+            assets += assets_batch
+
+        self.source_data = source_data
         return assets
 
     def _get_column_metadata(self):
@@ -109,27 +110,17 @@ class ImportValmer(DataNode):
 
         source_data = self.update_statistics.filter_df_by_latest_value(source_data)
 
-        self._set_column_metadata()
         return source_data
 
-
-    def get_table_metadata(self)->ms_client.TableMetaData:
-        """
-
-        """
-
-        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "vector_de_precios_valmer"
-
-        meta=ms_client.TableMetaData(  identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
-                                       data_frequency_id=DataFrequency.one_d,
-                                       description="This time series contains the valuation prices from the price provider VALMER",
-                                               )
-
+    def get_table_metadata(self) -> msc.TableMetaData:
+        TS_ID = "vector_de_precios_valmer"
+        meta = msc.TableMetaData(
+            identifier=TS_ID,
+            description=f"Vector de Precios Valmer",
+            data_frequency_id=msc.DataFrequency.one_month,
+        )
 
         return meta
-
-
-
 
 if __name__ == "__main__":
     ts = ImportValmer(
