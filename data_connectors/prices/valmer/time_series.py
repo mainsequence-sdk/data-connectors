@@ -9,7 +9,6 @@ from mainsequence.client.utils import DoesNotExist
 from mainsequence.tdag import DataNode
 import mainsequence.client as msc
 
-from mainsequence.virtualfundbuilder.utils import TIMEDELTA
 import numpy as np
 import pandas.api.types as ptypes
 
@@ -29,7 +28,7 @@ class ImportValmer(DataNode):
     _ARGS_IGNORE_IN_STORAGE_HASH = ["bucket_name", "artifact_name"]
 
     def maximum_forward_fill(self):
-        return timedelta(days=1) - TIMEDELTA
+        return timedelta(days=1) - pd.Timedelta("5ms")
 
     def get_explanation(self):
         explanation = (
@@ -50,27 +49,37 @@ class ImportValmer(DataNode):
     def get_asset_list(self) -> Union[None, list]:
         source_data = self._get_artifact_data()
 
-        asset_columns = ["unique_identifier", "isin"]
         source_data['unique_identifier'] = source_data["Instrumento"]
         source_data['isin'] = source_data['Isin'].apply(lambda x: None if pd.isna(x) else x)
-        source_data = source_data.drop(columns="Isin")
-        assets = []
+        asset_list = []
 
-        # insert assets (takes a long time) TODO implement batch update
-        # data = source_data[asset_columns].to_dict('records')
-        # for i, asset_data in enumerate(data):
-        #     if i % 500 == 0:
-        #         self.logger.info(f"Registered {i} assets out of {len(data)}")
-        #     snapshot = dict(name=asset_data["unique_identifier"], ticker=asset_data["unique_identifier"])
-        #     asset = msc.Asset.get_or_register_custom_asset(unique_identifier=asset_data["unique_identifier"], snapshot=snapshot, isin=asset_data["isin"])
-        #     assets.append(asset)
+        batch_size = 500
+        for i in range(0, len(source_data), batch_size):
 
-        for i in range(0, len(source_data), 500):
-            assets_batch = Asset.filter(unique_identifier__in=source_data["unique_identifier"].iloc[i:i+500].to_list())
-            assets += assets_batch
+            # Prepare the payload
+            assets_payload = []
+            for _, row in source_data.iloc[i:i+batch_size][["unique_identifier", "isin"]].iterrows():
+                snapshot = {
+                    "name": row["unique_identifier"],
+                    "ticker": row["unique_identifier"]
+                }
+                payload_item = {
+                    "unique_identifier": row["unique_identifier"],
+                    "snapshot": snapshot,
+                    "isin": row["isin"]
+                }
+                assets_payload.append(payload_item)
 
-        self.source_data = source_data
-        return assets
+            self.logger.info(f"Registering {i} to {i+batch_size-1} out of {len(source_data)} assets...")
+            try:
+                assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
+                asset_list += assets
+            except Exception as e:
+                self.logger.error(f"Failed to register assets in batch: {e}")
+                raise
+
+        self.source_data = source_data.drop(columns="Isin")
+        return asset_list
 
     def _get_column_metadata(self):
         from mainsequence.client.models_tdag import ColumnMetaData
