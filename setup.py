@@ -1,5 +1,9 @@
 import os
-import toml
+try:
+    import tomllib as toml  # Py3.11+
+except ModuleNotFoundError:
+    import tomli as toml
+
 from setuptools import setup, find_packages
 import subprocess
 from setuptools.command.install import install

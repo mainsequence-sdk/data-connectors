@@ -1,0 +1,8 @@
+# pyproject.toml (at repo root)
+[build-system]
+requires = [
+  "setuptools>=61",
+  "wheel",
+  "toml"            # because setup.py imports toml
+]
+build-backend = "setuptools.build_meta"
