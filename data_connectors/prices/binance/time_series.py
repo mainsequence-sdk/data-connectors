@@ -279,8 +279,7 @@ class BaseBinanceEndpoint(DataNode):
             return pd.DataFrame()
 
         # Simple memory check
-        n_jobs = min(os.cpu_count() or 1, 5)  # Limit jobs to avoid rate limits / DB issues
-
+        n_jobs = int(os.environ.get("BINANCE_BARS_JOBS",1))
         if not has_sufficient_memory(CONFIG.MEMORY_THRESHOLD):
             logger.warning("Memory usage too high, use sequential fetch.")
             n_jobs = 1
@@ -601,8 +600,12 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
                 )
                 COLUMNS = ["open", "high", "low", "volume", "close", "vwap", "open_time",
                            ]
-                tmp_bars=tmp_bars[COLUMNS]
-                if not tmp_bars.empty: all_dfs.append(tmp_bars)
+
+                if not tmp_bars.empty:
+                    tmp_bars = tmp_bars[COLUMNS]
+                    all_dfs.append(tmp_bars)
+                else:
+                    a=5
 
             elif isinstance(self.bar_configuration, ImbalanceBarConfig):
                 completed_bars, new_state = get_information_bars(

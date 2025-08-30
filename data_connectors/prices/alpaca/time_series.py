@@ -129,7 +129,7 @@ class AlpacaEquityBars(DataNode):
         max_skip = last_update + datetime.timedelta(
             days=360)
         if max_skip < datetime.datetime.now(pytz.utc):
-            last_available_value = max_skip
+            last_available_value = min(max_skip,last_available_value) #could be overrinden
 
 
         symbol = asset.current_snapshot.ticker
@@ -236,6 +236,8 @@ class AlpacaEquityBars(DataNode):
         # Calculate the lookback limit
         last_available_value = datetime.datetime.now(pytz.utc).replace(hour=0, minute=0, second=0) - datetime.timedelta(
             minutes=1)
+        if update_statistics.limit_update_time is not None:
+            last_available_value=update_statistics.limit_update_time+datetime.timedelta(days=1)
 
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -258,6 +260,8 @@ class AlpacaEquityBars(DataNode):
                         bars_request_df.extend(bar_set_requests)
                 except Exception:
                     self.logger.error("A request failed in the thread pool.", exc_info=True)
+
+
 
         if not bars_request_df:
             return pd.DataFrame()
@@ -308,6 +312,14 @@ class AlpacaEquityBars(DataNode):
 
         return bars_request_df
 
+    def get_calendars(self):
+        calendars = {str(cal): mcal.get_calendar(cal.replace("ARCA", "XNYS").replace("AMEX", "XNYS")) for cal in
+                     np.unique(list(self.asset_calendar_map.values()))}
+        return calendars
+
+
+
+
     def update(self):
         """
            [Core Logic] Fetches new bar data from the Alpaca API.
@@ -320,8 +332,7 @@ class AlpacaEquityBars(DataNode):
            4. For minute/hour bars, it calculates the closing timestamp based on the bar's open time.
            5. Formats the combined data into a final DataFrame ready for persistence.
         """
-        calendars = {str(cal): mcal.get_calendar(cal.replace("ARCA", "XNYS").replace("AMEX", "XNYS")) for cal in
-                     np.unique(list(self.asset_calendar_map.values()))}
+        calendars = self.get_calendars()
         bars_request_df = self._fetch_data_concurrently(self.update_statistics, calendars=calendars)
         if bars_request_df.empty:
             self.logger.info("No new bars were returned from the API.")

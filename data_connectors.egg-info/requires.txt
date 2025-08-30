@@ -1,0 +1,14 @@
+python-dotenv
+pandas-market-calendars
+fire
+databento
+
+[prices-alpaca]
+alpaca-py
+
+[prices-binance]
+python-binance
+python-coinmarketcap
+pycoingecko
+ccxt
+numba

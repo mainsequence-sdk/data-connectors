@@ -53,8 +53,10 @@ def test_binance_daily_bars():
 
 def test_alpaca_bars():
     from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
+    from data_connectors.helpers import update_calendar_holes
     from mainsequence.client import  Asset
     ts = AlpacaEquityBars( asset_list=None,frequency_id="1d", adjustment="all")
+    # update_calendar_holes(data_node=ts)
     ts.run(debug_mode=True,
 
            force_update=True)
@@ -150,10 +152,10 @@ def test_banxico_mbonos():
 
 # test_api_time_series()
 # test_binance_bars_from_trades()
-test_crypto_market_cap()
+# test_crypto_market_cap()
 # test_equity_market_cap()
 # test_binance_daily_bars()
-# test_alpaca_bars()
+test_alpaca_bars()
 # test_alpaca_bars_small()
 # test_banxico_mbonos()
 # test_databento_bars_small()
