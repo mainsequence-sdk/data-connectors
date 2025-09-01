@@ -1,5 +1,13 @@
 import os
-import toml
+import os
+try:
+    import tomllib as _toml  # Py 3.11+
+except ModuleNotFoundError:
+    try:
+        import tomli as _toml  # Py 3.10-
+    except ModuleNotFoundError:
+        import toml as _toml   # final fallback to old 'toml' package
+
 from setuptools import setup, find_packages
 import subprocess
 from setuptools.command.install import install
@@ -89,7 +97,7 @@ def load_pipfile():
     if not os.path.isfile(pipfile_path):
         return {}
     with open(pipfile_path, 'r') as fh:
-        return toml.load(fh)
+        return _toml.loads(fh.read())
 
 pipfile_toml = load_pipfile()
 

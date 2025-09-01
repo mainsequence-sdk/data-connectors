@@ -124,6 +124,8 @@ class BaseBinanceEndpoint(DataNode):
     ):
         super().__init__(*args, **kwargs)
         self.asset_list = asset_list
+        if asset_list is None:
+            assert asset_category_identifier is not None, "if asset list is empty requires an asset category identifier"
         if asset_category_identifier is not None:
             assert self.asset_list is None, "asset list should be empty if using an asset category identifier"
         self.asset_category_identifier = asset_category_identifier
@@ -279,8 +281,8 @@ class BaseBinanceEndpoint(DataNode):
             return pd.DataFrame()
 
         # Simple memory check
-        n_jobs = min(os.cpu_count() or 1, 5)  # Limit jobs to avoid rate limits / DB issues
-
+        n_jobs = int(os.environ.get("BINANCE_BARS_JOBS",1))
+        
         if not has_sufficient_memory(CONFIG.MEMORY_THRESHOLD):
             logger.warning("Memory usage too high, use sequential fetch.")
             n_jobs = 1
@@ -543,7 +545,7 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
     """
     DataNode for fetching raw trades from Binance and aggregating them into 1-minute bars.
     """
-    BATCH_UPDATE_DAYS = 365
+    BATCH_UPDATE_DAYS = int(os.environ.get("BINANCE_TRADES_DATES_LIMIT_UPDATE",90))
     LAST_AVAILABLE_DAYS = 1
     def __init__(
             self,
@@ -601,8 +603,11 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
                 )
                 COLUMNS = ["open", "high", "low", "volume", "close", "vwap", "open_time",
                            ]
-                tmp_bars=tmp_bars[COLUMNS]
-                if not tmp_bars.empty: all_dfs.append(tmp_bars)
+
+                if not tmp_bars.empty:
+                    tmp_bars = tmp_bars[COLUMNS]
+                    all_dfs.append(tmp_bars)
+
 
             elif isinstance(self.bar_configuration, ImbalanceBarConfig):
                 completed_bars, new_state = get_information_bars(

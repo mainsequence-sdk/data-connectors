@@ -16,6 +16,7 @@ import io
 from requests.exceptions import RequestException
 from numba import from_dtype
 import numba
+import os, io, time, tempfile
 
 
 tqdm.pandas()
@@ -184,6 +185,8 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
                                api_source: str, logger=None, chunksize=1_000_000,
                                max_retries: int = 3, timeout_seconds: int = 600,
                                ):
+    from data_connectors.helpers.s3_utils import is_s3_uri, cached_s3_fetch, S3Config,upload_file_to_s3
+
     if logger is None:
         logger = FakeLogger()
     from mainsequence.client import MARKETS_CONSTANTS as CONSTANTS # Local import to avoid circular dependency
@@ -195,21 +198,131 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
     logger.info(f"Building (optimized)... {url}")
     start_time = time.time()
 
-    # --- Robust Network Fetching with Retries and Timeout ---
-    response = None
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url, timeout=timeout_seconds, stream=True)
-            response.raise_for_status()
-            break
-        except RequestException as e:
-            logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {url}: {e}")
-            if attempt + 1 == max_retries:
-                raise Exception(f"All retries failed for {url}. Aborting.")
-            time.sleep(2 ** attempt)
 
-    if response is None:
-        raise Exception
+    # -- local repo ---
+    source_type = "spot" if "spot" in url else "futures"
+    local_path=os.environ.get("BINANCE_TEMP_FILES")
+    local_path=local_path+f"/{source_type}" if local_path else local_path
+    filename = url.rsplit("/", 1)[-1]  # e.g. BTCUSDT-trades-2018-07.zip
+    file_root, _ = os.path.splitext(filename)  # e.g. BTCUSDT-trades-2018-07
+
+    target_path = os.path.join(local_path, filename) if local_path else None
+    if local_path and is_s3_uri(local_path):
+        # os.path.join can introduce backslashes on Windows; ensure a clean S3 URI
+        target_path = f"{local_path.rstrip('/')}/{filename}"
+
+    zip_source = None
+    if local_path:
+        if is_s3_uri(local_path):
+            # S3 cache: try to pull cached object (if exists) to a local temp cache path
+            try:
+                cached_local_path = cached_s3_fetch(
+                    target_path,
+                    cache_root=None,  # use default ~/.cache/s3_cache inside s3_utils
+                    ttl_seconds=None,  # always validate remotely; if not found -> raises
+                    min_free_bytes=None,
+                    s3_config=S3Config.from_env(),
+                    logger=logger,
+                )
+                zip_source = cached_local_path
+                logger.info(f"S3 cached read {target_path} -> {zip_source}")
+            except Exception:
+                # Not present in S3 cache; we'll download via HTTP next
+                zip_source = None
+        else:
+
+            import shutil
+            os.makedirs(local_path, exist_ok=True)
+            MIN_FREE_BYTES = 50_000_000_000  # 50 GB (decimal)
+            free_bytes = shutil.disk_usage(local_path).free
+            if free_bytes < MIN_FREE_BYTES:
+                raise Exception("No Space to Keep Data")
+            if os.path.isfile(target_path):
+                # Use cached file
+                zip_source = target_path
+        logger.info(f"Local read {zip_source}")
+
+
+
+    # --- Robust Network Fetching with Retries and Timeout ---
+    cleanup_tmp_after_read = None  # only used if we create a temp file for S3 upload
+
+    if zip_source is None:
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(url, timeout=timeout_seconds, stream=True)
+                response.raise_for_status()
+                break
+            except RequestException as e:
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {url}: {e}")
+                if attempt + 1 == max_retries:
+                    raise Exception(f"All retries failed for {url}. Aborting.")
+                time.sleep(2 ** attempt)
+
+        if response is None:
+            raise Exception
+
+        if local_path:
+            if is_s3_uri(local_path):
+                # Write HTTP response to a local tmp, upload to S3 cache, then read from the tmp
+                tmpfile = None
+                try:
+                    with tempfile.NamedTemporaryFile("wb", delete=False) as tf:
+                        tmpfile = tf.name
+                        for chunk_data in response.iter_content(chunk_size=8192):
+                            if chunk_data:
+                                tf.write(chunk_data)
+                        tf.flush()
+                        os.fsync(tf.fileno())
+                    try:
+                        upload_file_to_s3(
+                            target_path,
+                            tmpfile,
+                            s3_config=S3Config.from_env(),
+                            content_type="application/zip",
+                        )
+                        logger.info(f"S3 cached write {target_path}")
+                    except Exception as e:
+                        logger.warning(f"S3 cache upload failed for {target_path}: {e}")
+                    zip_source = tmpfile
+                    cleanup_tmp_after_read = tmpfile  # remove after processing
+                except Exception:
+                    # Clean up tmp if anything went wrong before we set zip_source
+                    if tmpfile and os.path.exists(tmpfile):
+                        try:
+                            os.remove(tmpfile)
+                        except OSError:
+                            pass
+                    raise
+            else:
+                # Persist to local cache atomically
+                tmpfile = None
+                try:
+                    with tempfile.NamedTemporaryFile("wb", dir=local_path, delete=False) as tf:
+                        tmpfile = tf.name
+                        for chunk_data in response.iter_content(chunk_size=8192):
+                            if chunk_data:
+                                tf.write(chunk_data)
+                        tf.flush()
+                        os.fsync(tf.fileno())
+                    os.replace(tmpfile, target_path)  # atomic on POSIX/Windows
+                    zip_source = target_path
+                finally:
+                    # Clean up temp file if replace failed
+                    if tmpfile and os.path.exists(tmpfile):
+                        try:
+                            os.remove(tmpfile)
+                        except OSError:
+                            pass
+        else:
+            # Keep in memory
+            zip_in_memory = io.BytesIO()
+            for chunk_data in response.iter_content(chunk_size=8192):
+                if chunk_data:
+                    zip_in_memory.write(chunk_data)
+            zip_in_memory.seek(0)
+            zip_source = zip_in_memory
 
     # Numba works best with typed dictionaries
     bar_id_map = numba.typed.Dict.empty(
@@ -221,13 +334,18 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
     initial_size = 40000  # A full month of 1-min bars is ~43200
     global_agg_values = np.zeros(initial_size, dtype=bar_agg_type.dtype)
 
-    try:
-        zip_in_memory = io.BytesIO()
-        for chunk_data in response.iter_content(chunk_size=8192):
-            zip_in_memory.write(chunk_data)
-        zip_in_memory.seek(0)
+    only_download=os.environ.get("BINANCE_ONLY_DOWNLOAD","false").lower() == "true"
+    if only_download:
+        if cleanup_tmp_after_read and isinstance(zip_source, str) and os.path.exists(cleanup_tmp_after_read):
+            try:
+                os.remove(cleanup_tmp_after_read)
+            except OSError:
+                pass
+        return pd.DataFrame()
 
-        with ZipFile(zip_in_memory) as zipfile_obj:
+    try:
+
+        with ZipFile(zip_source) as zipfile_obj:
             csv_filename = file_root + ".csv"
             if csv_filename not in zipfile_obj.namelist():
                 logger.error(f"CSV '{csv_filename}' not found in zip from {url}")
@@ -240,13 +358,19 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
                         chunk.columns = SPOT_COLUMNS
                         chunk.drop(columns=["isBestMatch"], inplace=True)
                     else:
+                        if "price" in chunk.iloc[0].values:
+                            assert chunk.iloc[0].values.tolist()==['id', 'price', 'qty', 'quote_qty', 'time', 'is_buyer_maker']
+                            chunk=chunk.iloc[1:].copy()
+
                         chunk.columns = FUTURES_COLUMNS
 
                     # --- More Robust Data Cleaning - working with integers directly ---
                     # Handle potential header rows by coercing time column to numeric
                     chunk['time'] = pd.to_numeric(chunk['time'], errors='coerce')
-                    chunk["trade_id"] = pd.to_numeric(chunk["trade_id"], errors="coerce").astype(np.int64)
-
+                    try:
+                        chunk["trade_id"] = pd.to_numeric(chunk["trade_id"], errors="coerce").astype(np.int64)
+                    except Exception as e:
+                        raise e
                     chunk.dropna(subset=['time'], inplace=True)
                     if chunk.empty: continue
 
@@ -286,7 +410,13 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
     except Exception as e:
         logger.exception(f"Failed to process zip file from {url}: {e}")
         return pd.DataFrame()
-
+    finally:
+        # remove temp file created only to read (S3 upload case)
+        if cleanup_tmp_after_read and isinstance(zip_source, str) and os.path.exists(cleanup_tmp_after_read):
+            try:
+                os.remove(cleanup_tmp_after_read)
+            except OSError:
+                pass
     if not bar_id_map: return pd.DataFrame()
 
     # --- Final DataFrame Construction ---

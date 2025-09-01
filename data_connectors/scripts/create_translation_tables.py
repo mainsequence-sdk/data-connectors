@@ -14,18 +14,22 @@ def create_asset_translation_table():
                 security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
+            target_exchange_code="US"
         ),
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_ETP,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
+            target_exchange_code="US"
+
         ),
         AssetTranslationRule(
             asset_filter=AssetFilter(
                 security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_REIT,
             ),
             markets_time_serie_unique_identifier=markets_time_series_identifier,
+            target_exchange_code="US"
         )
     ]
     register_rules(

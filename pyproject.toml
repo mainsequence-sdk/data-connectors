@@ -1,0 +1,10 @@
+# pyproject.toml (at repo root)
+[build-system]
+requires = [
+  "setuptools>=61",
+  "wheel",
+  "tomli; python_version < '3.11'"
+  # optional extra fallback if you want:
+  # "toml; python_version < '3.11'"
+]
+build-backend = "setuptools.build_meta"

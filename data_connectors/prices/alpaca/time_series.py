@@ -122,14 +122,15 @@ class AlpacaEquityBars(DataNode):
 
         return TimeFrame(amount=frequency_amount, unit=self.FREQ_TO_TIMEFRAME_UNIT[frequency_unit])
 
-    def _process_asset_request(self, asset, last_update:datetime.datetime, last_available_value, client, calendars):
+    def _process_asset_request(self, asset, last_update:datetime.datetime, last_available_value, client, calendars,
+                               asset_calendar_map):
         if client is None:
             return None
 
         max_skip = last_update + datetime.timedelta(
             days=360)
         if max_skip < datetime.datetime.now(pytz.utc):
-            last_available_value = max_skip
+            last_available_value = min(max_skip,last_available_value) #could be overrinden
 
 
         symbol = asset.current_snapshot.ticker
@@ -140,7 +141,7 @@ class AlpacaEquityBars(DataNode):
         end_year = last_available_value.year
         years = range(start_year, end_year + 1)
 
-        asset_calendar = calendars[self.asset_calendar_map[asset.unique_identifier]]
+        asset_calendar = calendars[asset_calendar_map[asset.unique_identifier]]
 
         # Prepare the requests to send later in the thread pool
         requests = []
@@ -198,7 +199,7 @@ class AlpacaEquityBars(DataNode):
                     (tmp_f.index.get_level_values("timestamp") > current_start) &
                     (tmp_f.index.get_level_values("timestamp") <= current_end)
                     ]
-                tmp_f["calendar"] = self.asset_calendar_map[asset.unique_identifier]
+                tmp_f["calendar"] = asset_calendar_map[asset.unique_identifier]
                 tmp_f["unique_identifier"] = asset.unique_identifier
                 requests.append(tmp_f)
 
@@ -221,21 +222,21 @@ class AlpacaEquityBars(DataNode):
             assets = get_stock_assets()
             self.asset_list = assets
 
-        self.asset_calendar_map = {a.unique_identifier: a.get_calendar().name for a in self.asset_list}
         return self.asset_list
 
-    def _fetch_data_concurrently(self, update_statistics:UpdateStatistics,calendars) -> pd.DataFrame:
+    def _fetch_data_concurrently(self, update_statistics:UpdateStatistics,calendars,asset_calendar_map) -> pd.DataFrame:
         """
         Uses a thread pool to fetch data for all specified assets from the Alpaca API.
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         bars_request_df = []  # Using the original variable name
-        workers = int(os.environ.get("ALPACA_MAX_WORKERS", 5))
-        workers=1
+        workers = int(os.environ.get("ALPACA_MAX_WORKERS", 1))
         # Calculate the lookback limit
         last_available_value = datetime.datetime.now(pytz.utc).replace(hour=0, minute=0, second=0) - datetime.timedelta(
             minutes=1)
+        if update_statistics.limit_update_time is not None:
+            last_available_value=update_statistics.limit_update_time
 
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -246,7 +247,8 @@ class AlpacaEquityBars(DataNode):
                     last_update=update_statistics.get_last_update_index_2d(asset.unique_identifier),
                     last_available_value=last_available_value,
                     client=self.get_client_for_asset(asset),
-                    calendars=calendars
+                    calendars=calendars,
+                    asset_calendar_map=asset_calendar_map
                 )
                 for asset in tqdm(update_statistics.asset_list, desc="Submitting Assets to Thread Pool")
             ]
@@ -258,6 +260,8 @@ class AlpacaEquityBars(DataNode):
                         bars_request_df.extend(bar_set_requests)
                 except Exception:
                     self.logger.error("A request failed in the thread pool.", exc_info=True)
+
+
 
         if not bars_request_df:
             return pd.DataFrame()
@@ -308,6 +312,11 @@ class AlpacaEquityBars(DataNode):
 
         return bars_request_df
 
+
+
+
+
+
     def update(self):
         """
            [Core Logic] Fetches new bar data from the Alpaca API.
@@ -320,9 +329,12 @@ class AlpacaEquityBars(DataNode):
            4. For minute/hour bars, it calculates the closing timestamp based on the bar's open time.
            5. Formats the combined data into a final DataFrame ready for persistence.
         """
+        asset_calendar_map = {a.unique_identifier: a.get_calendar().name for a in self.update_statistics.asset_list}
         calendars = {str(cal): mcal.get_calendar(cal.replace("ARCA", "XNYS").replace("AMEX", "XNYS")) for cal in
-                     np.unique(list(self.asset_calendar_map.values()))}
-        bars_request_df = self._fetch_data_concurrently(self.update_statistics, calendars=calendars)
+                     np.unique(list(asset_calendar_map.values()))}
+        bars_request_df = self._fetch_data_concurrently(self.update_statistics,
+                                                        asset_calendar_map=asset_calendar_map,
+                                                        calendars=calendars)
         if bars_request_df.empty:
             self.logger.info("No new bars were returned from the API.")
             return pd.DataFrame()
