@@ -51,7 +51,6 @@ def analyze_missing_prices(
     *,
     frequency: str,
     asset_universe: Optional[Sequence[Union[str, Any]]] = None,
-    asset_calendar_map: Optional[Mapping[str, str]] = None,
     # If provided, used to ask the node to return only certain value columns (we only need the index for this analysis)
     # Chunk size: if None, defaults to 1 day for minute data, 90 days for daily
     chunk_size: Optional[dt.timedelta] = None,
@@ -125,18 +124,13 @@ def analyze_missing_prices(
     if asset_universe is not None:
         universe_uids = _coerce_to_uid_list(asset_universe)
 
-    # Build the working universe = provided universe ∪ calendar-mapped assets (so unmapped assets aren't dropped)
-    calendar_assets = set(asset_calendar_map.keys()) if asset_calendar_map else set()
-    working_universe: set[str] = set(universe_uids or []) | calendar_assets
+    working_universe=universe_uids
 
     # ---- prepare calendars (per distinct code) ----
     def _norm_cal_code(c: str) -> str:
         return c.upper().replace("ARCA", "XNYS").replace("AMEX", "XNYS")
 
-    calendars: Dict[str, Any] = {}
-    if asset_calendar_map:
-        for code in { _norm_cal_code(c) for c in asset_calendar_map.values() }:
-            calendars[code] = mcal.get_calendar(code)
+
 
     # ---- accumulators ----
     # Per-asset present/expected counts
@@ -156,13 +150,29 @@ def analyze_missing_prices(
     last_missing_ts: Dict[str, Optional[dt.datetime]] = {}             # last missing expected ts we saw
 
     # ---- iterate over time in chunks ----
+    calendars: Dict[str, Any] = {}
+    asset_calendar_map:Dict[str, Any] = {}
+    asset_uid_map:Dict[str,msc.Asset]   ={}
     for b_start, b_end_excl in tqdm(_iterate_time_ranges(start, end_excl, chunk_size), desc="calendar-missingness"):
         # 1) Fetch observed pairs once for the chunk
 
-        update_range_map={k:{"start_date":b_start,"end_date":b_end_excl,"start_date_operand":">","end_date_operand":"<="} for k in asset_universe}
-        df = prices_node.get_ranged_data_per_asset(
-            range_descriptor=update_range_map
+
+        df = prices_node.get_df_between_dates(
+            start_date=b_start,columns=column_filter,
+            end_date=b_end_excl,unique_identifier_list=universe_uids
         )
+        uids_in_df=df.index.get_level_values("unique_identifier").unique()
+        new_assets=[a for a in uids_in_df if a not in asset_uid_map.keys()]
+
+        if len(new_assets)>0:
+            new_assets = msc.Asset.filter(unique_identifier__in=new_assets)
+            for a in new_assets:
+                asset_uid_map[a.unique_identifier]=a
+                asset_calendar_map[a.unique_identifier]=a.get_calendar().name
+
+            for code in {_norm_cal_code(c) for c in asset_calendar_map.values()}:
+                calendars[code] = mcal.get_calendar(code)
+            calendar_assets=list(asset_calendar_map.keys())
 
         times_by_asset: Dict[str, List[dt.datetime]] = {}
         if df is not None and not df.empty:
@@ -519,60 +529,57 @@ def _record_missing_points(
     )
 
 
-def update_calendar_holes(data_node:DataNode):
+def update_calendar_holes(data_node:DataNode,start_date:dt.datetime,
+                          frequency) -> None:
 
     """
 
     """
-    asset_list=data_node.get_asset_list()
-    asset_list=[a for a in asset_list if a.ticker=="VICI"] #TEST
 
     #1 Get Price Summary
     from data_connectors.helpers.asset_consistency import analyze_missing_prices
 
 
     update_stats=data_node.local_persist_manager.metadata.sourcetableconfiguration.get_data_updates()
-    update_stats=update_stats.update_assets(asset_list=asset_list,)
     update_stats._initial_fallback_date=data_node.OFFSET_START
     last_update_in_list=update_stats.get_max_time_in_update_statistics()
 
 
 
-
-
-    asset_calendar_map= {a.unique_identifier: a.get_calendar().name for a in asset_list}
-
     results = analyze_missing_prices(
         data_node,
-        start_date=data_node.OFFSET_START,
+        start_date=start_date,
         end_date=last_update_in_list,
-        frequency=data_node.frequency_id,
-        asset_universe=list(asset_calendar_map.keys()),
-        asset_calendar_map=asset_calendar_map,
+        frequency=frequency,
+        asset_universe=None,
         chunk_size=dt.timedelta(days=90),
         column_filter=["close"],
     )
 
-    uid_ticker_map={a.unique_identifier:a.ticker for a in asset_list}
+
+    relevant_assets=msc.Asset.filter(unique_identifier__in=results.missing_runs.unique_identifier.tolist())
+    uid_ticker_map={a.unique_identifier:a.ticker for a in relevant_assets}
     results.missing_runs["ticker"]=results.missing_runs["unique_identifier"].map(uid_ticker_map)
 
     missing_runs=results.missing_runs
-    for _,row in results.missing_windows.iterrows():
+    missing_windows=results.missing_windows
+    for _,row in missing_windows.iterrows():
 
         asset_in_row=missing_runs[(missing_runs.missing_start==row.missing_start)
                                     & (missing_runs.missing_end==row.missing_end)
         ]
 
-        tmp_asset_list=[a for a in asset_list if a.unique_identifier in asset_in_row.unique_identifier.to_list()]
+        tmp_asset_list=[a for a in relevant_assets if a.unique_identifier in asset_in_row.unique_identifier.to_list()]
 
         tmp_update_stats= data_node.local_persist_manager.metadata.sourcetableconfiguration.get_data_updates()
         tmp_update_stats=tmp_update_stats.update_assets(asset_list=tmp_asset_list,)
-        tmp_update_stats.limit_update_time=row.missing_end+dt.timedelta(days=1)
+        tmp_update_stats.limit_update_time=row.missing_end
 
         tmp_update_stats.asset_time_statistics={k:row.missing_start-dt.timedelta(days=1) for k in tmp_update_stats.asset_time_statistics.keys()}
         tmp_update_stats.max_time_index_value=row.missing_end
+        tmp_update_stats.is_backfill=True
 
-        data_node.run(debug_mode=True,force_update=True,override_update_stats=tmp_update_stats)
+        error_on_last_update,updated_df=data_node.run(debug_mode=True,force_update=True,override_update_stats=tmp_update_stats)
 
         a=5
 
