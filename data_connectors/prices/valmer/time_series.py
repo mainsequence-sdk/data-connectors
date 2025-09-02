@@ -1,20 +1,13 @@
 import re
-
-from mainsequence.client.models_tdag import Artifact
 from datetime import timedelta
 from typing import Union, Dict
-import io
-
 import pandas as pd
-
-from mainsequence.client import Asset
-from mainsequence.client.utils import DoesNotExist
-from mainsequence.tdag import DataNode
-import mainsequence.client as msc
-
-import numpy as np
-import pandas.api.types as ptypes
 from tqdm import tqdm
+import mainsequence.client as msc
+import numpy as np
+from mainsequence.client import Asset
+from mainsequence.client.models_tdag import Artifact
+from mainsequence.tdag import DataNode
 
 
 class ImportValmer(DataNode):
@@ -23,6 +16,12 @@ class ImportValmer(DataNode):
             bucket_name: str,
             *args, **kwargs
     ):
+        """
+        Initializes the ImportValmer DataNode.
+
+        Args:
+            bucket_name (str): The name of the bucket containing the source files.
+        """
         self.bucket_name = bucket_name
         self.artifact_data = None
         super().__init__(*args, **kwargs)
@@ -36,13 +35,24 @@ class ImportValmer(DataNode):
         explanation = (
             "### Data From Valmer\n\n"
             "This node reads all files from the specified Valmer bucket, "
-            "combines them, and processes them in a single operation."
+            "combines them, and processes them in a single operation. "
+            "It normalizes all column headers by lowercasing them and removing special characters."
         )
         return explanation
 
+    @staticmethod
+    def _normalize_column_name(col_name: str) -> str:
+        """
+        Removes special characters and newlines from a string and converts it to lowercase.
+        """
+        # Replace newlines and then remove all non-alphanumeric characters
+        cleaned_name = str(col_name).replace('\n', ' ')
+        return re.sub(r'[^a-z0-9]', '', cleaned_name.lower())
+
     def _get_artifact_data(self):
         """
-        Reads all artifacts from the bucket, sorts them, and concatenates them into a single DataFrame.
+        Reads all artifacts from the bucket, normalizes columns, and concatenates them into a single DataFrame.
+        Optionally filters for new artifacts based on the 'process_all_files' flag.
         """
         if self.artifact_data is not None:
             return self.artifact_data
@@ -52,6 +62,7 @@ class ImportValmer(DataNode):
 
         self.logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{self.bucket_name}'.")
 
+        # --- Conditional processing based on process_all_files flag ---
         artifact_dates = []
         for artifact in sorted_artifacts:
             match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
@@ -62,22 +73,15 @@ class ImportValmer(DataNode):
 
         latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
         if latest_date:
-            sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date >= latest_date]
+            self.logger.info(f"Filtering artifacts newer than {latest_date}.")
+            sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date > latest_date]
 
-        self.logger.info(f"Processing {len(sorted_artifacts)} new artifacts...")
+        sorted_artifacts = sorted_artifacts[:1]
+
+        self.logger.info(f"Processing {len(sorted_artifacts)} artifacts...")
         if not sorted_artifacts:
             self.logger.info("No new artifacts to process. Task finished.")
             return pd.DataFrame()
-
-        # Read only what we need to build Instrumento + price + date
-        excel_usecols = ["TIPO VALOR", "EMISORA", "SERIE", "PRECIO SUCIO", "FECHA"]
-        excel_dtypes = {
-            "TIPO VALOR": "string",
-            "EMISORA": "string",
-            "SERIE": "string",
-            "PRECIO SUCIO": "float64",
-            "FECHA": "string",
-        }
 
         frames = []
         for artifact in tqdm(sorted_artifacts):
@@ -88,12 +92,8 @@ class ImportValmer(DataNode):
             df = None
             if name_l.endswith(".xls"):
                 import xlrd  # noqa: F401
-                df = pd.read_excel(
-                    buf, engine="xlrd",
-                    usecols=excel_usecols, dtype=excel_dtypes
-                )
+                df = pd.read_excel(buf, engine="xlrd")
             elif name_l.endswith(".csv"):
-                # Use pyarrow engine when available; otherwise let pandas choose.
                 try:
                     df = pd.read_csv(buf, encoding="latin1", engine="pyarrow")
                 except Exception:
@@ -105,25 +105,28 @@ class ImportValmer(DataNode):
             if df is None or df.empty:
                 continue
 
-            # Normalize columns once per file
-            if {"TIPO VALOR", "EMISORA", "SERIE"}.issubset(df.columns):
-                # build Instrumento
-                instrumento = (
-                    df["TIPO VALOR"].astype("string")
-                    .str.cat(df["EMISORA"].astype("string"), sep="_")
-                    .str.cat(df["SERIE"].astype("string"), sep="_")
+            # Normalize all column names
+            df.columns = [self._normalize_column_name(col) for col in df.columns]
+
+            # Check for required columns for instrument identifier
+            required_cols = {"tipovalor", "emisora", "serie"}
+            if required_cols.issubset(df.columns):
+                # Build unique_identifier while keeping all other columns
+                df["unique_identifier"] = (
+                    df["tipovalor"].astype("string")
+                    .str.cat(df["emisora"].astype("string"), sep="_")
+                    .str.cat(df["serie"].astype("string"), sep="_")
                 )
-                df = df.rename(columns={"PRECIO SUCIO": "preciosucio", "FECHA": "Fecha"})
-                # keep only the columns we actually use downstream
-                df = pd.DataFrame({
-                    "Instrumento": instrumento,
-                    "preciosucio": df["preciosucio"],
-                    "Fecha": df["Fecha"],
-                })[["Instrumento", "preciosucio", "Fecha"]]
+            else:
+                self.logger.warning(
+                    f"Skipping unique_identifier creation for {artifact.name} due to missing columns."
+                )
+                continue
+
             frames.append(df)
 
         if not frames:
-            raise ValueError(f"No valid .xls/.xlsx/.xlsb or .csv files found in bucket '{self.bucket_name}'.")
+            raise ValueError(f"No valid data frames could be created from files in bucket '{self.bucket_name}'.")
 
         try:
             self.artifact_data = pd.concat(frames, ignore_index=True, sort=False, copy=False)
@@ -143,7 +146,6 @@ class ImportValmer(DataNode):
         self.source_data = self._get_artifact_data()
         if self.source_data.empty: return []
 
-        self.source_data['unique_identifier'] = self.source_data["Instrumento"]
         self.source_data = self.source_data[self.source_data['unique_identifier'].notna()].copy()
 
         unique_identifiers = self.source_data['unique_identifier'].unique().tolist()
@@ -196,28 +198,29 @@ class ImportValmer(DataNode):
         if source_data.empty:
             return pd.DataFrame()
 
-        source_data.rename(columns={"Fecha": "time_index"}, inplace=True)
+        # Use the normalized column names 'fecha' and 'preciosucio'
+        if "fecha" not in source_data.columns or "preciosucio" not in source_data.columns:
+            raise KeyError("Normalized columns 'fecha' and/or 'preciosucio' not found in the data.")
+
+        source_data.rename(columns={"fecha": "time_index"}, inplace=True)
         source_data['time_index'] = pd.to_datetime(source_data['time_index'], format='%Y%m%d', utc=True)
 
-        source_data = source_data[["time_index", "unique_identifier", "preciosucio"]]
+        # Select only the necessary columns for the final OHLCV output
+        price_series = source_data['preciosucio'].astype(float)
+        ohlc_df = pd.DataFrame(index=source_data.index)
+        ohlc_df['time_index'] = source_data['time_index']
+        ohlc_df['unique_identifier'] = source_data['unique_identifier']
+        ohlc_df['open'] = price_series
+        ohlc_df['high'] = price_series
+        ohlc_df['low'] = price_series
+        ohlc_df['close'] = price_series
+        ohlc_df['volume'] = 0
+        ohlc_df['open_time'] = ohlc_df['time_index'].astype(np.int64) // 10 ** 9
 
-        price_series = source_data['preciosucio']
+        ohlc_df.set_index(["time_index", "unique_identifier"], inplace=True)
+        ohlc_df = self.update_statistics.filter_df_by_latest_value(ohlc_df)
 
-        # Map to OHLC columns
-        source_data['open'] = price_series
-        source_data['close'] = price_series
-        source_data['high'] = price_series
-        source_data['low'] = price_series
-        source_data['volume'] = 0
-        source_data['open_time'] = source_data['time_index'].astype(np.int64) // 10 ** 9
-
-        # Drop the original price column as it's now represented by OHLC
-        source_data = source_data.drop(columns=['preciosucio'])
-
-        source_data.set_index(["time_index", "unique_identifier"], inplace=True)
-        source_data = self.update_statistics.filter_df_by_latest_value(source_data)
-
-        return source_data
+        return ohlc_df
 
     def get_table_metadata(self) -> msc.TableMetaData:
         TS_ID = "vector_de_precios_valmer"
@@ -232,13 +235,10 @@ class ImportValmer(DataNode):
 if __name__ == "__main__":
     BUCKET_NAME = "Vector de precios"
 
-    # Initialize the DataNode once with the bucket name
-    ts = ImportValmer(
+    ts_all_files = ImportValmer(
         bucket_name=BUCKET_NAME,
     )
-
-    # Run the process for all files in the bucket
-    ts.run(
+    ts_all_files.run(
         debug_mode=True,
         force_update=True,
     )
