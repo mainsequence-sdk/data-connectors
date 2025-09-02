@@ -1,3 +1,5 @@
+import re
+
 from mainsequence.client.models_tdag import Artifact
 from datetime import timedelta
 from typing import Union, Dict
@@ -49,7 +51,20 @@ class ImportValmer(DataNode):
         artifacts = Artifact.filter(bucket__name=self.bucket_name)
         sorted_artifacts = sorted(artifacts, key=lambda artifact: artifact.name)
 
-        self.logger.info(f"Found {len(sorted_artifacts)} artifacts to process in bucket '{self.bucket_name}'.")
+        self.logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{self.bucket_name}'.")
+
+        latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
+
+        artifact_dates = []
+        for artifact in sorted_artifacts:
+            match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
+            if match:
+                artifact_dates.append(pd.to_datetime(match.group(1), utc=True))
+            else:
+                raise ValueError(f"No date found for prices xls with name {artifact.name}")
+
+        sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date > latest_date]
+        self.logger.info(f"Processing {len(sorted_artifacts)} new artifacts...")
 
         # Read only what we need to build Instrumento + price + date
         excel_usecols = ["TIPO VALOR", "EMISORA", "SERIE", "PRECIO SUCIO", "FECHA"]
@@ -62,7 +77,7 @@ class ImportValmer(DataNode):
         }
 
         frames = []
-        for artifact in tqdm(sorted_artifacts[100:]):
+        for artifact in tqdm(sorted_artifacts):
             name_l = artifact.name.lower()
             content = artifact.content
             buf = content
