@@ -43,7 +43,6 @@ class ImportValmer(DataNode):
     def _get_artifact_data(self):
         """
         Reads all artifacts from the bucket, sorts them, and concatenates them into a single DataFrame.
-        Single-threaded, but much faster via column selection, explicit dtypes, and proper engines.
         """
         if self.artifact_data is not None:
             return self.artifact_data
@@ -53,8 +52,6 @@ class ImportValmer(DataNode):
 
         self.logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{self.bucket_name}'.")
 
-        latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
-
         artifact_dates = []
         for artifact in sorted_artifacts:
             match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
@@ -63,8 +60,14 @@ class ImportValmer(DataNode):
             else:
                 raise ValueError(f"No date found for prices xls with name {artifact.name}")
 
-        sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date > latest_date]
+        latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
+        if latest_date:
+            sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date >= latest_date]
+
         self.logger.info(f"Processing {len(sorted_artifacts)} new artifacts...")
+        if not sorted_artifacts:
+            self.logger.info("No new artifacts to process. Task finished.")
+            return pd.DataFrame()
 
         # Read only what we need to build Instrumento + price + date
         excel_usecols = ["TIPO VALOR", "EMISORA", "SERIE", "PRECIO SUCIO", "FECHA"]
@@ -72,8 +75,8 @@ class ImportValmer(DataNode):
             "TIPO VALOR": "string",
             "EMISORA": "string",
             "SERIE": "string",
-            "PRECIO SUCIO": "float64",  # parse numeric directly
-            "FECHA": "string",  # parse later in update()
+            "PRECIO SUCIO": "float64",
+            "FECHA": "string",
         }
 
         frames = []
@@ -84,18 +87,11 @@ class ImportValmer(DataNode):
 
             df = None
             if name_l.endswith(".xls"):
-                # xlrd is fastest for legacy xls if available, else fall back to openpyxl
-                try:
-                    import xlrd  # noqa: F401
-                    df = pd.read_excel(
-                        buf, engine="xlrd",
-                        usecols=excel_usecols, dtype=excel_dtypes
-                    )
-                except Exception:
-                    df = pd.read_excel(
-                        buf, engine="openpyxl",
-                        usecols=excel_usecols, dtype=excel_dtypes
-                    )
+                import xlrd  # noqa: F401
+                df = pd.read_excel(
+                    buf, engine="xlrd",
+                    usecols=excel_usecols, dtype=excel_dtypes
+                )
             elif name_l.endswith(".csv"):
                 # Use pyarrow engine when available; otherwise let pandas choose.
                 try:
@@ -109,9 +105,9 @@ class ImportValmer(DataNode):
             if df is None or df.empty:
                 continue
 
-            # Normalize columns once per file (cheap & vectorized)
+            # Normalize columns once per file
             if {"TIPO VALOR", "EMISORA", "SERIE"}.issubset(df.columns):
-                # build Instrumento without Python-level loops
+                # build Instrumento
                 instrumento = (
                     df["TIPO VALOR"].astype("string")
                     .str.cat(df["EMISORA"].astype("string"), sep="_")
@@ -119,7 +115,6 @@ class ImportValmer(DataNode):
                 )
                 df = df.rename(columns={"PRECIO SUCIO": "preciosucio", "FECHA": "Fecha"})
                 # keep only the columns we actually use downstream
-                keep_cols = ["preciosucio", "Fecha"]
                 df = pd.DataFrame({
                     "Instrumento": instrumento,
                     "preciosucio": df["preciosucio"],
@@ -130,11 +125,9 @@ class ImportValmer(DataNode):
         if not frames:
             raise ValueError(f"No valid .xls/.xlsx/.xlsb or .csv files found in bucket '{self.bucket_name}'.")
 
-        # Fast concat; avoid sorting and extra copies
         try:
             self.artifact_data = pd.concat(frames, ignore_index=True, sort=False, copy=False)
         except TypeError:
-            # older pandas without copy= parameter
             self.artifact_data = pd.concat(frames, ignore_index=True, sort=False)
 
         self.logger.info(f"Combined all artifacts into a single DataFrame with {len(self.artifact_data)} rows.")
@@ -147,27 +140,21 @@ class ImportValmer(DataNode):
         """
         Processes and registers each unique asset only once from the combined DataFrame.
         """
-        source_data = self._get_artifact_data()
+        self.source_data = self._get_artifact_data()
+        if self.source_data.empty: return []
 
-        source_data['unique_identifier'] = source_data["Instrumento"]
-        source_data = source_data[source_data['unique_identifier'].notna()].copy()
+        self.source_data['unique_identifier'] = self.source_data["Instrumento"]
+        self.source_data = self.source_data[self.source_data['unique_identifier'].notna()].copy()
 
-        # Keep a copy of the full data for the update() method
-        self.source_data = source_data.copy()
-
-        # Get a list of unique identifiers to avoid processing duplicates
-        unique_identifiers = source_data['unique_identifier'].unique().tolist()
+        unique_identifiers = self.source_data['unique_identifier'].unique().tolist()
         self.logger.info(f"Found {len(unique_identifiers)} unique assets to process.")
 
         asset_list = []
         batch_size = 500
-
-        # Loop through the list of unique identifiers in batches
         for i in range(0, len(unique_identifiers), batch_size):
             batch_identifiers = unique_identifiers[i:i + batch_size]
             assets_payload = []
 
-            # Create a payload for each unique identifier in the current batch
             for identifier in batch_identifiers:
                 snapshot = {
                     "name": identifier,
@@ -193,7 +180,6 @@ class ImportValmer(DataNode):
         return asset_list
 
     def _get_column_metadata(self):
-        # This metadata should reflect the columns you intend to save to the database.
         from mainsequence.client.models_tdag import ColumnMetaData
         return [
             ColumnMetaData(column_name="open", dtype="float", label="Open"),
@@ -207,15 +193,13 @@ class ImportValmer(DataNode):
         source_data = self.source_data
         assert source_data is not None, "Source data is not available"
 
+        if source_data.empty:
+            return pd.DataFrame()
+
         source_data.rename(columns={"Fecha": "time_index"}, inplace=True)
         source_data['time_index'] = pd.to_datetime(source_data['time_index'], format='%Y%m%d', utc=True)
 
-        # Note: This line drastically reduces the number of columns.
-        # Ensure your _get_column_metadata reflects the final schema.
         source_data = source_data[["time_index", "unique_identifier", "preciosucio"]]
-
-        # Clean column names after subsetting
-        source_data.columns = [col.lower().replace(' ', '_').replace('.', '_') for col in source_data.columns]
 
         price_series = source_data['preciosucio']
 
