@@ -180,6 +180,49 @@ def aggregate_trades_chunk(
     return bar_id_map, global_agg_values
 
 
+import re
+_UNIT_FACTOR = {
+    "s": 1,
+    "ms": 10**3,
+    "us": 10**6,
+    "ns": 10**9,
+}
+
+def _parse_freq_seconds(freq: str) -> int:
+    """'1m', '5m', '1h', '1d', '1w' (and synonyms like '1min','1day')."""
+    s = str(freq).strip().lower().replace(" ", "")
+    # normalize common synonyms
+    s = (s.replace("minutes", "m").replace("minute", "m").replace("mins", "m").replace("min", "m")
+           .replace("seconds", "s").replace("second", "s").replace("secs", "s").replace("sec", "s")
+           .replace("hours", "h").replace("hour", "h").replace("hrs", "h").replace("hr", "h")
+           .replace("days", "d").replace("day", "d")
+           .replace("weeks", "w").replace("week", "w").replace("wks", "w").replace("wk", "w"))
+    m = re.fullmatch(r"(\d+)([smhdw])", s)
+    if not m:
+        raise NotImplementedError(f"{freq} not supported")
+    n = int(m.group(1))
+    mult = {'s':1, 'm':60, 'h':3600, 'd':86400, 'w':604800}[m.group(2)]
+    return n * mult
+
+def _infer_epoch_per_second(times_arr: np.ndarray) -> int:
+    """
+    Detect epoch unit by magnitude. Returns units per second:
+      1 (s), 1_000 (ms), 1_000_000 (µs), or 1_000_000_000 (ns).
+    """
+    # Use median of |values| to avoid outliers
+    t = np.abs(times_arr.astype(np.int64, copy=False))
+    if t.size == 0:
+        return 1_000  # sensible default: ms
+    med = float(np.median(t))
+    if med < 1e11:        # ~seconds (1.7e9 today)
+        return 1
+    if med < 1e14:        # ~milliseconds (1.7e12)
+        return 1_000
+    if med < 1e17:        # ~microseconds (1.7e15)
+        return 1_000_000
+    return 1_000_000_000  # nanoseconds
+
+_EPOCH_UNIT_STR = {1:'s', 1_000:'ms', 1_000_000:'us', 1_000_000_000:'ns'}
 
 def get_bars_by_date_optimized(url, file_root, bars_frequency,
                                api_source: str, logger=None, chunksize=1_000_000,
@@ -194,8 +237,9 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
 
     FUTURES_COLUMNS = ["trade_id", "price", "qty", "quoteQty", "time", "isBuyerMaker"]
     SPOT_COLUMNS = ["trade_id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"]
-
-    logger.info(f"Building (optimized)... {url}")
+    only_download = os.environ.get("BINANCE_ONLY_DOWNLOAD", "false").lower() == "true"
+    if only_download == False:
+        logger.info(f"Building (optimized)... {url}")
     start_time = time.time()
 
 
@@ -226,6 +270,8 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
                 )
                 zip_source = cached_local_path
                 logger.info(f"S3 cached read {target_path} -> {zip_source}")
+                if only_download:
+                    return pd.DataFrame()
             except Exception:
                 # Not present in S3 cache; we'll download via HTTP next
                 zip_source = None
@@ -248,6 +294,7 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
     cleanup_tmp_after_read = None  # only used if we create a temp file for S3 upload
 
     if zip_source is None:
+        logger.info(f"Downloading File from  {url}")
         response = None
         for attempt in range(max_retries):
             try:
@@ -257,7 +304,7 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
             except RequestException as e:
                 logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {url}: {e}")
                 if attempt + 1 == max_retries:
-                    raise Exception(f"All retries failed for {url}. Aborting.")
+                    logger.warning(f"All retries failed for {url}. Aborting.")
                 time.sleep(2 ** attempt)
 
         if response is None:
@@ -334,7 +381,6 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
     initial_size = 40000  # A full month of 1-min bars is ~43200
     global_agg_values = np.zeros(initial_size, dtype=bar_agg_type.dtype)
 
-    only_download=os.environ.get("BINANCE_ONLY_DOWNLOAD","false").lower() == "true"
     if only_download:
         if cleanup_tmp_after_read and isinstance(zip_source, str) and os.path.exists(cleanup_tmp_after_read):
             try:
@@ -342,6 +388,7 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
             except OSError:
                 pass
         return pd.DataFrame()
+
 
     try:
 
@@ -395,12 +442,11 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
                     )
                     trade_ids_arr = chunk["trade_id"].to_numpy(dtype=np.int64)  # ← NEW
 
-                    if bars_frequency == "1m":
-                        bar_ids = (times_arr // 60000) * 60000
-                    elif bars_frequency in ["1d", "1day"]:
-                        bar_ids = (times_arr // 86400000) * 86400000
-                    else:
-                        raise NotImplementedError(f"{bars_frequency} not supported")
+                    sec_per_bar = _parse_freq_seconds(bars_frequency)  # e.g., 5m -> 300
+                    units_per_sec = _infer_epoch_per_second(times_arr)  # s/ms/µs/ns
+                    step = np.int64(sec_per_bar) * np.int64(units_per_sec)  # bar length in the same unit as times_arr
+                    bar_ids = (times_arr // step) * step
+
 
                     bar_id_map, global_agg_values = aggregate_trades_chunk(
                         bar_ids, prices_arr, qtys_arr, quote_qtys_arr, times_arr, is_buyer_maker_arr,
@@ -428,21 +474,20 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
     ohlc.drop(columns=['sum_price_qty'], inplace=True)
 
     # The 'open_time' of the bar is its floored start time.
-    ohlc['open_time'] = ohlc['bar_id_start']#pd.to_datetime(ohlc['bar_id_start'], unit='ms', utc=True)
-    ohlc['first_trade_time'] =ohlc['first_trade_time']# pd.to_datetime(ohlc['first_trade_time'], unit='ms', utc=True)
-    ohlc['last_trade_time'] = ohlc['last_trade_time']# pd.to_datetime(ohlc['last_trade_time'], unit='ms', utc=True)
 
-    # Calculate frequency in seconds to get the bar's closing timestamp
-    if bars_frequency == "1m":
-        frequency_to_seconds = 60
-    elif bars_frequency in ["1d", "1day"]:
-        frequency_to_seconds = 86400
-    else:
-        raise NotImplementedError(f"Cannot determine frequency in seconds for {bars_frequency}")
+    # Convert times using the same epoch unit we inferred from bar_id_start
+    units_per_sec_idx = _infer_epoch_per_second(ohlc['bar_id_start'].to_numpy(dtype=np.int64))
+    unit_str = _EPOCH_UNIT_STR[units_per_sec_idx]
+    sec_per_bar = _parse_freq_seconds(bars_frequency)
+
+    # Open/first/last trade times (all in correct unit + UTC tz)
+    ohlc['open_time'] = pd.to_datetime(ohlc['bar_id_start'], unit=unit_str, utc=True)
+    ohlc['first_trade_time'] = pd.to_datetime(ohlc['first_trade_time'], unit=unit_str, utc=True)
+    ohlc['last_trade_time'] = pd.to_datetime(ohlc['last_trade_time'], unit=unit_str, utc=True)
+
 
     # The final bar timestamp (the index) is the bar's closing time.
-    ohlc['time_index'] = pd.to_datetime(ohlc['bar_id_start'], unit='ms', utc=True)+ pd.to_timedelta(frequency_to_seconds, unit='s')
-
+    ohlc['time_index'] = ohlc['open_time'] + pd.to_timedelta(sec_per_bar, unit='s')
     ohlc.drop(columns=['bar_id_start'], inplace=True)
     logger.info(f"--- Completed {url} in {time.time() - start_time:.2f}s ---")
     return ohlc.set_index('time_index')

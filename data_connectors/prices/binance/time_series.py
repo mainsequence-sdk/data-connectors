@@ -217,7 +217,7 @@ class BaseBinanceEndpoint(DataNode):
         all_bars = self._run_parallel_fetch(update_ranges)
         if all_bars.empty:
             return pd.DataFrame()
-
+        all_bars = all_bars[~all_bars.index.duplicated(keep="first")]
         return all_bars
 
     def _get_active_assets_and_start_dates(self) -> Tuple[List[str], Dict[str, datetime.date]]:
@@ -595,12 +595,18 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
         for chunk_date in tqdm(processing_chunks, desc=f"Processing {uid}", leave=False):
             url, file_root = self._get_url_and_root_for_chunk(symbol_info, chunk_date)
 
-            if isinstance(self.bar_configuration, TimeBarConfig):
+            # if "ONDOUSDT-trades-2025-04" not in url:
+            #     continue
 
-                tmp_bars = get_bars_by_date_optimized(
-                    url=url, file_root=file_root, api_source=symbol_info["api_source"],
-                    bars_frequency=self.bar_configuration.frequency_id,logger=logger
-                )
+            if isinstance(self.bar_configuration, TimeBarConfig):
+                try:
+                    tmp_bars = get_bars_by_date_optimized(
+                        url=url, file_root=file_root, api_source=symbol_info["api_source"],
+                        bars_frequency=self.bar_configuration.frequency_id,logger=logger
+                    )
+                except Exception as e:
+                    logger.error(url)
+                    raise e
                 COLUMNS = ["open", "high", "low", "volume", "close", "vwap", "open_time",
                            ]
 
