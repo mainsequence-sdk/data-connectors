@@ -19,6 +19,7 @@ from mainsequence.client import (MARKETS_CONSTANTS,
                                  DoesNotExist, Asset, AssetCurrencyPair, AssetFutureUSDM, DataFrequency,
                                 AssetCategory
                                  )
+import mainsequence.client as msc
 from abc import ABC, abstractmethod
 
 import mainsequence.client as ms_client
@@ -112,7 +113,7 @@ class NoDataInURL(Exception):
 
 class BaseBinanceEndpoint(DataNode):
     """Base class for fetching historical data from Binance."""
-    OFFSET_START = datetime.datetime(2017, 1, 1, tzinfo=pytz.utc)
+    OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
     _ARGS_IGNORE_IN_STORAGE_HASH=["asset_list","asset_category_identifier"]
     def __init__(
             self,
@@ -132,8 +133,7 @@ class BaseBinanceEndpoint(DataNode):
         self._bar_config_dict = bar_configuration.model_dump() #needs to be passed as dict when runnignparallerl
         self.info_map: Dict[str, dict] = {}
 
-        if self.asset_list is not None:
-            self._init_info_map(self.asset_list)
+
 
     @property
     def bar_configuration(self) -> TimeBarConfig:
@@ -150,6 +150,19 @@ class BaseBinanceEndpoint(DataNode):
         from mainsequence.client import MARKETS_CONSTANTS as CONSTANTS
 
         info_map = {}
+
+        #verify that assets have the right type
+        query_with_class = False
+        for a in asset_list:
+            if hasattr(a, "currency_pair")==False and  a.security_type == CONSTANTS.FIGI_SECURITY_TYPE_GENERIC_CURRENCY_FUTURE:
+                query_with_class=True
+                break
+            if hasattr(a, "base_asset") == False :
+                query_with_class=True
+                break
+        if query_with_class == True:
+            asset_list=msc.Asset.filter_with_asset_class(id__in=[a.id for a in asset_list])
+
         for asset in asset_list:
             # Correctly determine the symbol based on security type
             currency_asset=asset
@@ -201,8 +214,7 @@ class BaseBinanceEndpoint(DataNode):
 
     def update(self,) -> pd.DataFrame:
         """Main update orchestrator."""
-        if not self.info_map:
-            self._init_info_map(self.update_statistics.asset_list)
+        self._init_info_map(self.update_statistics.asset_list)
 
         # 1. Get active assets and their historical start dates
         active_uids, start_date_map = self._get_active_assets_and_start_dates()
@@ -242,6 +254,11 @@ class BaseBinanceEndpoint(DataNode):
                 logger.debug(f"Skipping {uid} ({info['binance_symbol']}) - not in TRADING status.")
                 continue
 
+            last_update=self.update_statistics.get_last_update_index_2d(uid)
+            if last_update> self.OFFSET_START:
+                start_date_map[uid]=last_update.date()
+                active_uids.append(uid)
+                continue # no need to query first update time
             # Find first trade date from Binance API to avoid 404s on historical data
             endpoint = CONFIG.FUTURES_API_URL if is_future else CONFIG.SPOT_API_URL
             api_call="fapi" if is_future else "api"
@@ -269,6 +286,9 @@ class BaseBinanceEndpoint(DataNode):
 
             # Apply batching limit to avoid huge downloads
             end_date = min(start_date + datetime.timedelta(days=self.BATCH_UPDATE_DAYS), last_available_date)
+
+            if self.update_statistics.limit_update_time is not None:
+                end_date=self.update_statistics.limit_update_time.date()
 
             if end_date > start_date:
                 update_ranges[uid] = pd.date_range(start_date, end_date, freq='D')
@@ -570,6 +590,16 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
         file_root = f"{binance_symbol}-trades-{date_str}"
         url = f"{root_url}{binance_symbol}/{file_root}.zip"
         return url, file_root
+
+    def get_table_metadata(self) -> Optional[ms_client.TableMetaData]:
+
+        identifier = f"binance_{self.bar_configuration.frequency_id}_bars"
+        return ms_client.TableMetaData(
+            identifier=identifier,
+            description=f"Binance {self.bar_configuration.frequency_id}  include vwap from trades",
+            data_frequency_id=DataFrequency(self.bar_configuration.frequency_id),
+        )
+
 
     def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex,logger) -> pd.DataFrame:
         """

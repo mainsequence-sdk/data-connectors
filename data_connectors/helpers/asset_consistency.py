@@ -7,10 +7,19 @@ from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional,
 from collections import defaultdict
 
 import pandas as pd
-
+import numpy as np
 # Main Sequence SDK import rule (guardrail): import as `msc`
 import mainsequence.client as msc  # noqa: F401
 from mainsequence.tdag import DataNode  # typing/interface only
+
+
+
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Optional, Sequence, Union, Any, Dict, List
+
+
+
 
 # Optional progress bar
 try:
@@ -22,404 +31,6 @@ except Exception:  # pragma: no cover
 UTC = dt.timezone.utc
 
 
-@dataclass
-class MissingnessResult:
-    """
-    Output container for missingness analysis.
-    """
-    # One row per contiguous missing block per asset.
-    # Columns: ["unique_identifier","missing_start","missing_end","expected_points","duration",
-    #           "missing_start_day","missing_end_day"]
-    missing_runs: pd.DataFrame
-
-    # One row per timestamp (UTC).
-    # Columns: ["present_assets","expected_assets","missing_assets","coverage_ratio"]
-    summary_by_time: pd.DataFrame
-
-    # One row per asset. Columns: ["present_points","expected_points","coverage_ratio"]
-    asset_coverage: pd.DataFrame
-
-    # Grouped-by-window view: how many assets are missing in each (missing_start, missing_end)
-    # Columns: ["missing_start","missing_end","assets_missing","expected_points","duration","start_day","end_day"]
-    missing_windows: pd.DataFrame
-
-
-def analyze_missing_prices(
-    prices_node: DataNode,
-    start_date: dt.datetime,
-    end_date: dt.datetime,
-    *,
-    frequency: str,
-    asset_universe: Optional[Sequence[Union[str, Any]]] = None,
-    # If provided, used to ask the node to return only certain value columns (we only need the index for this analysis)
-    # Chunk size: if None, defaults to 1 day for minute data, 90 days for daily
-    chunk_size: Optional[dt.timedelta] = None,
-    # If False, skips building the potentially large per-timestamp summary
-    emit_time_summary: bool = True,
-    column_filter: Optional[Sequence[str]] = None,
-) -> MissingnessResult:
-    """
-    Analyze where asset prices are missing, using exchange calendars to define the *expected* time grid per asset.
-
-    Parameters
-    ----------
-    prices_node : DataNode
-        A DataNode whose table uses a UTC time index "time_index" and, for multi-asset data, a MultiIndex
-        ("time_index","unique_identifier"). This is the Main Sequence DataNode contract.
-    start_date, end_date : datetime
-        UTC datetimes. `end_date` is treated as *exclusive* (analyze [start_date, end_date)).
-    frequency : {"minute","min","1min","1T","daily","day","1d","d"}
-        Sampling frequency of the table (determines the expected grid density).
-    asset_universe : Optional[Sequence[str|Any]]
-        The assets to analyze (either unique_identifier strings or objects with .unique_identifier).
-        If omitted, the universe = union of assets observed + any keys in asset_calendar_map.
-    asset_calendar_map : Optional[Mapping[str, str]]
-        Maps unique_identifier -> market calendar code (e.g., "XNYS"). Codes like "ARCA"/"AMEX" are normalized to "XNYS".
-        Assets without a mapping are treated as having *no expected grid* (they will not contribute to expected counts
-        and will have expected_points=0 unless they appear via another mechanism).
-
-    chunk_size : Optional[timedelta]
-        Size of time window per call to `get_df_between_dates`. Defaults:
-          - minute data: 1 day
-          - daily  data: 90 days
-    emit_time_summary : bool
-        Whether to accumulate a per-timestamp summary (can be large for minute data).
-    column_filter : Optional[Sequence[str]]
-        Forwarded to `prices_node.get_df_between_dates(..., columns=column_filter)` if supported by your node.
-
-    Returns
-    -------
-    MissingnessResult
-        - missing_runs: contiguous missing intervals per asset with expected point counts (calendar-aware)
-        - summary_by_time: per-timestamp present/expected/missing and coverage ratio (calendar-aware)
-        - asset_coverage: per-asset coverage computed against the asset's calendar schedule
-        - missing_windows: grouped view of identical (missing_start, missing_end) windows
-
-    Notes
-    -----
-    * Uses exchange calendars (via pandas_market_calendars) to define the expected grid per asset.
-    * Keeps memory bounded by chunking time and avoiding giant dense grids.
-    """
-    # ---- imports required for calendar logic ----
-    try:
-        import pandas_market_calendars as mcal  # type: ignore
-    except Exception as e:  # pragma: no cover
-        raise ImportError(
-            "pandas_market_calendars is required for calendar-aware missingness. "
-            "Install with `pip install pandas-market-calendars`."
-        ) from e
-
-    # ---- normalize inputs & frequency ----
-    start = _normalize_utc(start_date)
-    end_excl = _normalize_utc(end_date)
-    if end_excl <= start:
-        raise ValueError("end_date must be greater than start_date (exclusive end).")
-
-    step = _freq_to_step(frequency)
-    if chunk_size is None:
-        chunk_size = dt.timedelta(days=1) if step == dt.timedelta(minutes=1) else dt.timedelta(days=90)
-
-    # ---- universe coercion ----
-    universe_uids: Optional[List[str]] = None
-    if asset_universe is not None:
-        universe_uids = _coerce_to_uid_list(asset_universe)
-
-    working_universe=universe_uids
-
-    # ---- prepare calendars (per distinct code) ----
-    def _norm_cal_code(c: str) -> str:
-        return c.upper().replace("ARCA", "XNYS").replace("AMEX", "XNYS")
-
-
-
-    # ---- accumulators ----
-    # Per-asset present/expected counts
-    present_pts: DefaultDict[str, int] = defaultdict(int)
-    expected_pts: DefaultDict[str, int] = defaultdict(int)
-
-    # Missing runs (appended rows)
-    missing_rows: List[Dict[str, Any]] = []
-
-    # Per-timestamp series lists
-    present_series_list: List[pd.Series] = []
-    expected_series_list: List[pd.Series] = []
-
-    # Cross-chunk state to stitch runs
-    open_missing_start: Dict[str, Optional[dt.datetime]] = {}          # where an open missing run started (UTC)
-    open_missing_len: DefaultDict[str, int] = defaultdict(int)         # how many expected points missing so far
-    last_missing_ts: Dict[str, Optional[dt.datetime]] = {}             # last missing expected ts we saw
-
-    # ---- iterate over time in chunks ----
-    calendars: Dict[str, Any] = {}
-    asset_calendar_map:Dict[str, Any] = {}
-    asset_uid_map:Dict[str,msc.Asset]   ={}
-    for b_start, b_end_excl in tqdm(_iterate_time_ranges(start, end_excl, chunk_size), desc="calendar-missingness"):
-        # 1) Fetch observed pairs once for the chunk
-
-
-        df = prices_node.get_df_between_dates(
-            start_date=b_start,columns=column_filter,
-            end_date=b_end_excl,unique_identifier_list=universe_uids
-        )
-        uids_in_df=df.index.get_level_values("unique_identifier").unique()
-        new_assets=[a for a in uids_in_df if a not in asset_uid_map.keys()]
-
-        if len(new_assets)>0:
-            new_assets = msc.Asset.filter(unique_identifier__in=new_assets)
-            for a in new_assets:
-                asset_uid_map[a.unique_identifier]=a
-                asset_calendar_map[a.unique_identifier]=a.get_calendar().name
-
-            for code in {_norm_cal_code(c) for c in asset_calendar_map.values()}:
-                calendars[code] = mcal.get_calendar(code)
-            calendar_assets=list(asset_calendar_map.keys())
-
-        times_by_asset: Dict[str, List[dt.datetime]] = {}
-        if df is not None and not df.empty:
-            idx = df.index
-            # Validate MultiIndex with names ("time_index","unique_identifier") — DataNode contract
-            if not isinstance(idx, pd.MultiIndex) or {"time_index", "unique_identifier"} - set(idx.names):
-                raise ValueError("Expected MultiIndex with levels ['time_index','unique_identifier'].")
-
-            pairs = (
-                idx.to_frame(index=False)[["time_index", "unique_identifier"]]
-                .drop_duplicates()
-                .sort_values(["unique_identifier", "time_index"])
-            )
-            # Ensure UTC tz-aware times
-            if pairs["time_index"].dt.tz is None:
-                pairs["time_index"] = pairs["time_index"].dt.tz_localize(UTC)
-            else:
-                pairs["time_index"] = pairs["time_index"].dt.tz_convert(UTC)
-
-            # present-by-time for this chunk (observed)
-            if emit_time_summary:
-                s_present = pairs.groupby("time_index")["unique_identifier"].nunique()
-                s_present.name = "present_assets"
-                present_series_list.append(s_present)
-
-            # times per asset (observed in this chunk)
-            times_by_asset = pairs.groupby("unique_identifier")["time_index"].apply(list).to_dict()
-
-        # 2) Determine assets to process this batch
-        if universe_uids:
-            assets_this_batch = set(universe_uids)
-        else:
-            # Union of observed, calendar-declared, and any assets with open runs
-            assets_this_batch = set(times_by_asset).union(calendar_assets).union(open_missing_start.keys())
-
-        # Optionally trim to working universe if one was provided
-        if working_universe:
-            assets_this_batch &= working_universe
-
-        if not assets_this_batch:
-            continue
-
-        # 3) Group assets by calendar code (unmapped assets fall into None bucket)
-        assets_by_cal: DefaultDict[Optional[str], List[str]] = defaultdict(list)
-        for uid in assets_this_batch:
-            cal_code = None
-            if asset_calendar_map:
-                cal_code = _norm_cal_code(asset_calendar_map.get(uid, None)) if uid in asset_calendar_map else None
-            assets_by_cal[cal_code].append(uid)
-
-        # 4) For each calendar, build the expected grid once; reuse across its assets
-        #    Also accumulate expected counts per timestamp with a single vector add × (#assets on that calendar).
-        if emit_time_summary:
-            # chunk-level expected counts
-            expected_counts_map: DefaultDict[pd.Timestamp, int] = defaultdict(int)
-        else:
-            expected_counts_map = None  # type: ignore
-
-        for cal_code, uids in assets_by_cal.items():
-            if cal_code is None:
-                # No calendar -> no expectations for these assets in this chunk
-                # We still count their observed presence in present_series_list (already done).
-                continue
-
-            cal = calendars.get(cal_code)
-            if cal is None:
-                # Shouldn't happen; but be defensive
-                calendars[cal_code] = cal = mcal.get_calendar(cal_code)
-
-            # Build expected timestamps for this calendar & chunk
-            expected_ts_list = _expected_ts_for_calendar(cal, b_start, b_end_excl, step)
-            if not expected_ts_list:
-                # Nothing expected in this chunk on this calendar (e.g., full holiday/weekend window)
-                # If some assets have open missing runs, we leave them open and move on.
-                continue
-
-            expected_ts_list = sorted(expected_ts_list)  # ensure monotonic
-            expected_ts_set = set(expected_ts_list)
-
-            # Per-timestamp expected count for the calendar (vector add by #assets in this calendar)
-            if emit_time_summary:
-                n_assets_cal = len(uids)
-                for t in expected_ts_list:
-                    expected_counts_map[t] += n_assets_cal
-
-            # 5) Asset-level coverage & runs for this calendar
-            for uid in uids:
-                observed_list = times_by_asset.get(uid, [])
-                observed_set = set(observed_list)
-
-                # Count present only where expected
-                if observed_set:
-                    present_pts[uid] += sum(1 for t in observed_set if t in expected_ts_set)
-
-                # Count expected for this asset in this chunk
-                expected_pts[uid] += len(expected_ts_list)
-
-                # (A) If an open missing run existed from prior chunk and the first expected ts here is PRESENT,
-                #     we must close the prior run at the last_missing_ts we saw earlier.
-                if open_missing_start.get(uid) is not None and expected_ts_list and (expected_ts_list[0] in observed_set):
-                    _record_missing_points(
-                        rows=missing_rows,
-                        uid=uid,
-                        start=open_missing_start[uid],
-                        end=last_missing_ts.get(uid),
-                        num_points=open_missing_len.get(uid, 0),
-                        step=step,
-                    )
-                    open_missing_start[uid] = None
-                    open_missing_len[uid] = 0
-                    last_missing_ts[uid] = None
-
-                # (B) Walk the expected grid; open/extend/close missing runs
-                for e in expected_ts_list:
-                    if e in observed_set:
-                        # Close any open run right before this present stamp
-                        if open_missing_start.get(uid) is not None:
-                            _record_missing_points(
-                                rows=missing_rows,
-                                uid=uid,
-                                start=open_missing_start[uid],
-                                end=last_missing_ts.get(uid),
-                                num_points=open_missing_len.get(uid, 0),
-                                step=step,
-                            )
-                            open_missing_start[uid] = None
-                            open_missing_len[uid] = 0
-                            last_missing_ts[uid] = None
-                        # else: nothing to close
-                    else:
-                        # Missing at e
-                        if open_missing_start.get(uid) is None:
-                            open_missing_start[uid] = e
-                            open_missing_len[uid] = 1
-                        else:
-                            open_missing_len[uid] += 1
-                        last_missing_ts[uid] = e
-
-        # 6) Commit expected counts for this chunk to the series list
-        if emit_time_summary and expected_counts_map:
-            s_expected = pd.Series(expected_counts_map, dtype="int64").sort_index()
-            s_expected.index.name = "time_index"
-            s_expected.name = "expected_assets"
-            expected_series_list.append(s_expected)
-
-    # ---- finalize across all chunks ----
-    # Close any runs still open at the last expected timestamp we’ve seen for each asset
-    for uid, start_ts in list(open_missing_start.items()):
-        if start_ts is not None and last_missing_ts.get(uid) is not None:
-            _record_missing_points(
-                rows=missing_rows,
-                uid=uid,
-                start=start_ts,
-                end=last_missing_ts[uid],
-                num_points=open_missing_len.get(uid, 0),
-                step=step,
-            )
-        # Clear state
-        open_missing_start[uid] = None
-        open_missing_len[uid] = 0
-        last_missing_ts[uid] = None
-
-    # Missing runs table (+ day-of-week)
-    if missing_rows:
-        missing_runs = (
-            pd.DataFrame(missing_rows)
-            .sort_values(["unique_identifier", "missing_start"])
-            .reset_index(drop=True)
-        )
-        # Normalize dtypes & add weekday labels
-        missing_runs["missing_start"] = pd.to_datetime(missing_runs["missing_start"], utc=True)
-        missing_runs["missing_end"]   = pd.to_datetime(missing_runs["missing_end"],   utc=True)
-        missing_runs["missing_start_day"] = missing_runs["missing_start"].dt.day_name()
-        missing_runs["missing_end_day"]   = missing_runs["missing_end"].dt.day_name()
-    else:
-        missing_runs = pd.DataFrame(
-            columns=["unique_identifier","missing_start","missing_end","expected_points","duration",
-                     "missing_start_day","missing_end_day"]
-        )
-
-    # Grouped windows
-    if not missing_runs.empty:
-        missing_windows = (
-            missing_runs
-            .groupby(["missing_start","missing_end"], as_index=False)
-            .agg(
-                assets_missing=("unique_identifier","nunique"),
-                expected_points=("expected_points","first"),
-                duration=("duration","first"),
-            )
-            .sort_values(["missing_start","missing_end"])
-        )
-        missing_windows["start_day"] = missing_windows["missing_start"].dt.day_name()
-        missing_windows["end_day"]   = missing_windows["missing_end"].dt.day_name()
-    else:
-        missing_windows = pd.DataFrame(
-            columns=["missing_start","missing_end","assets_missing","expected_points","duration","start_day","end_day"]
-        )
-
-    # Asset coverage
-    # If an asset had no calendar mapping (expected_pts=0), coverage_ratio will be NaN
-    asset_rows = []
-    for uid in sorted(set(list(present_pts.keys()) + list(expected_pts.keys()))):
-        exp_ = int(expected_pts.get(uid, 0))
-        pres = int(present_pts.get(uid, 0))
-        asset_rows.append(
-            {
-                "unique_identifier": uid,
-                "present_points": pres,
-                "expected_points": exp_,
-                "coverage_ratio": (pres / exp_) if exp_ > 0 else float("nan"),
-            }
-        )
-    asset_coverage = pd.DataFrame(asset_rows).set_index("unique_identifier").sort_index()
-
-    # Time summary
-    if emit_time_summary:
-        if expected_series_list:
-            expected_by_time = pd.concat(expected_series_list).groupby(level=0).sum().sort_index()
-        else:
-            expected_by_time = pd.Series(dtype="int64", name="expected_assets")
-            expected_by_time.index.name = "time_index"
-
-        if present_series_list:
-            present_by_time = pd.concat(present_series_list).groupby(level=0).sum().sort_index()
-        else:
-            present_by_time = pd.Series(dtype="int64", name="present_assets")
-            present_by_time.index.name = "time_index"
-
-        # Align present to the expected grid; outside the expected grid, we consider no expectation
-        summary_by_time = pd.DataFrame({"expected_assets": expected_by_time})
-        summary_by_time["present_assets"] = present_by_time.reindex(summary_by_time.index, fill_value=0)
-        summary_by_time["missing_assets"] = summary_by_time["expected_assets"] - summary_by_time["present_assets"]
-        # Avoid divide-by-zero; where expected==0, coverage is NaN (no expectation at that ts)
-        with pd.option_context("mode.use_inf_as_na", True):
-            summary_by_time["coverage_ratio"] = summary_by_time["present_assets"] / summary_by_time["expected_assets"]
-    else:
-        summary_by_time = pd.DataFrame(columns=["present_assets","expected_assets","missing_assets","coverage_ratio"])
-        summary_by_time.index.name = "time_index"
-
-    return MissingnessResult(
-        missing_runs=missing_runs,
-        summary_by_time=summary_by_time,
-        asset_coverage=asset_coverage,
-        missing_windows=missing_windows,
-    )
-
 
 # ----------------- helpers ----------------- #
 
@@ -430,7 +41,7 @@ def _normalize_utc(x: dt.datetime) -> dt.datetime:
 
 def _freq_to_step(freq: str) -> dt.timedelta:
     f = freq.strip().lower()
-    if f in {"minute","min","1min","1t"}:
+    if f in {"minute","min","1min","1t","1m"}:
         return dt.timedelta(minutes=1)
     if f in {"daily","day","1d","d"}:
         return dt.timedelta(days=1)
@@ -500,7 +111,7 @@ def _expected_ts_for_calendar(cal, start_dt: dt.datetime, end_dt: dt.datetime, s
         if session_end_excl <= session_start:
             continue
         # Build minute grid [open, close) — last minute ends at close-1min
-        rng = pd.date_range(start=session_start, end=session_end_excl - dt.timedelta(minutes=1), freq="T", tz="UTC")
+        rng = pd.date_range(start=session_start, end=session_end_excl - dt.timedelta(minutes=1), freq="min", tz="UTC")
         if len(rng):
             expected.extend(rng.to_list())
     return expected
@@ -529,40 +140,347 @@ def _record_missing_points(
     )
 
 
+@dataclass
+class MissingnessResult:
+    """
+    Output container for missingness analysis.
+    """
+    # One row per contiguous missing block per asset.
+    # Columns: ["unique_identifier","missing_start","missing_end","expected_points","duration",
+    #           "missing_start_day","missing_end_day"]
+    missing_runs: pd.DataFrame
+
+    # One row per timestamp (UTC).
+    # Columns: ["present_assets","expected_assets","missing_assets","coverage_ratio"]
+    summary_by_time: pd.DataFrame
+
+    # One row per asset. Columns: ["present_points","expected_points","coverage_ratio"]
+    asset_coverage: pd.DataFrame
+
+    # Grouped-by-window view: how many assets are missing in each (missing_start, missing_end)
+    # Columns: ["missing_start","missing_end","assets_missing","expected_points","duration","start_day","end_day"]
+    missing_windows: pd.DataFrame
+
+    uid_minima:Optional[Dict[str, dt.datetime]]=None
+
+# Assume other necessary imports like tqdm, mcal, MissingnessResult, etc., are present
+from bisect import bisect_right
+
+def _process_calendar_chunk(
+    cal_code: str, uids: List[str], b_start: dt.datetime, b_end_excl: dt.datetime,
+    step: dt.timedelta, times_by_asset: Dict[str, List[dt.datetime]],
+    open_missing_start: Dict[str, Optional[dt.datetime]],
+    open_missing_len: Dict[str, int], last_missing_ts: Dict[str, Optional[dt.datetime]],
+    emit_time_summary: bool, uid_minima: Optional[Dict] = None
+) -> Dict[str, Any]:
+
+    import pandas_market_calendars as mcal
+    mcal_calendar = mcal.get_calendar(cal_code)
+    expected_ts_list = sorted(_expected_ts_for_calendar(mcal_calendar, b_start, b_end_excl, step))
+    if not expected_ts_list:
+        return {"status": "skipped"}
+
+    expected_ts_set = set(expected_ts_list)
+
+    # --- Build observed matrix (UID x time) ---
+    uid_to_idx = {uid: i for i, uid in enumerate(uids)}
+    ts_to_idx  = {ts:  i for i, ts  in enumerate(expected_ts_list)}
+    M, N = len(uids), len(expected_ts_list)
+    observed = np.zeros((M, N), dtype=bool)
+    for uid in uids:
+        for ts in set(times_by_asset.get(uid, [])) & expected_ts_set:
+            observed[uid_to_idx[uid], ts_to_idx[ts]] = True
+
+    # --- Build expected mask from uid_minima (what we *expect* to exist) ---
+    expected_mask = np.zeros((M, N), dtype=bool)
+    first_expected_idx = np.zeros(M, dtype=int)  # first in-scope idx per uid
+    if uid_minima:
+        for i, uid in enumerate(uids):
+            min_ts = uid_minima.get(uid)
+            cut = bisect_right(expected_ts_list, min_ts) if min_ts is not None else 0
+            first_expected_idx[i] = cut
+            if cut < N:
+                expected_mask[i, cut:] = True
+    else:
+        expected_mask[:] = True
+        # already zero for first_expected_idx
+
+    # --- Present/expected counts *in scope* ---
+    observed_in_scope = observed & expected_mask
+    present_counts_vec   = observed_in_scope.sum(axis=1).astype(np.int64)
+    expected_counts_vec  = expected_mask.sum(axis=1).astype(np.int64)
+    present_counts  = {uid: int(present_counts_vec[i])  for i, uid in enumerate(uids)}
+    expected_counts = {uid: int(expected_counts_vec[i]) for i, uid in enumerate(uids)}
+
+    # --- Time summaries (cross‑section at each ts) ---
+    if emit_time_summary:
+        s_present  = pd.Series(observed_in_scope.sum(axis=0), index=expected_ts_list, dtype="int64")
+        s_expected = pd.Series(expected_mask.sum(axis=0),     index=expected_ts_list, dtype="int64")
+    else:
+        s_present  = pd.Series(dtype="int64")
+        s_expected = pd.Series(dtype="int64")
+
+    # --- Close any open run that ends because the *first expected* point is present ---
+    is_first_ts_present_arr = np.zeros(M, dtype=bool)
+    for i, uid in enumerate(uids):
+        idx0 = first_expected_idx[i]
+        if idx0 < N:
+            is_first_ts_present_arr[i] = observed[i, idx0]  # OK: idx0 is “expected” by construction
+
+    chunk_missing_rows = []
+    for i, uid in enumerate(uids):
+        if open_missing_start.get(uid) and is_first_ts_present_arr[i]:
+            chunk_missing_rows.append({
+                "uid": uid,
+                "start": open_missing_start.pop(uid),
+                "end":   last_missing_ts.pop(uid),
+                "num_points": open_missing_len.pop(uid, 0),
+            })
+
+    # --- Missing matrix is: expected and not observed ---
+    missing = expected_mask & (~observed)
+    if not missing.any():
+        return {
+            "status": "success",
+            "present_counts": present_counts,
+            "expected_counts": expected_counts,      # <-- NEW
+            "missing_rows": chunk_missing_rows,
+            "open_missing_start": open_missing_start,
+            "open_missing_len": open_missing_len,
+            "last_missing_ts": last_missing_ts,
+            "s_expected": s_expected,                # per-time expected assets
+            "s_present": s_present,                  # per-time present assets
+        }
+
+    # --- Run-length encode missing per UID to emit windows ---
+    run_groups = (missing != np.roll(missing, 1, axis=1)).cumsum(axis=1)
+    run_groups[~missing] = 0
+
+    for i, uid in enumerate(uids):
+        row = run_groups[i, :]
+        if not row.any():
+            continue
+        run_ids, run_starts_idx, run_counts = np.unique(row, return_index=True, return_counts=True)
+        if run_ids[0] == 0:
+            run_starts_idx = run_starts_idx[1:]
+            run_counts = run_counts[1:]
+        for start_idx, count in zip(run_starts_idx, run_counts):
+            run_start_ts = expected_ts_list[start_idx]
+            run_end_ts   = expected_ts_list[start_idx + count - 1]
+            if open_missing_start.get(uid) and (run_start_ts - last_missing_ts.get(uid, run_start_ts) <= step):
+                open_missing_len[uid] += count
+                last_missing_ts[uid] = run_end_ts
+            else:
+                if open_missing_start.get(uid):
+                    chunk_missing_rows.append({
+                        "uid": uid,
+                        "start": open_missing_start.pop(uid),
+                        "end":   last_missing_ts.pop(uid),
+                        "num_points": open_missing_len.pop(uid, 0),
+                    })
+                open_missing_start[uid] = run_start_ts
+                open_missing_len[uid]   = count
+                last_missing_ts[uid]    = run_end_ts
+
+    return {
+        "status": "success",
+        "present_counts": present_counts,
+        "expected_counts": expected_counts,          # <-- NEW
+        "missing_rows": chunk_missing_rows,
+        "open_missing_start": open_missing_start,
+        "open_missing_len": open_missing_len,
+        "last_missing_ts": last_missing_ts,
+        "s_expected": s_expected,
+        "s_present": s_present,
+    }
+
+
+def analyze_missing_data(
+        data_node: 'DataNode', start_date: dt.datetime, end_date: dt.datetime, *,
+        frequency: str, asset_universe: Optional[Sequence[Union[str, Any]]] = None,
+        chunk_size: Optional[dt.timedelta] = None, emit_time_summary: bool = True,
+        column_filter: Optional[Sequence[str]] = None, num_workers: int = 1,
+        use_minimals: bool = False
+) -> MissingnessResult:
+    start = _normalize_utc(start_date)
+    end_excl = _normalize_utc(end_date)
+    step = _freq_to_step(frequency)
+    chunk_size = chunk_size or (dt.timedelta(days=1) if step == dt.timedelta(minutes=1) else dt.timedelta(days=90))
+
+    initial_uids = _coerce_to_uid_list(asset_universe) if asset_universe else list(
+        data_node.metadata.sourcetableconfiguration.multi_index_stats["max_per_asset_symbol"].keys())
+    # Placeholder for your msc.Asset logic
+    # universe_assets = msc.Asset.filter(unique_identifier__in=initial_uids)
+    # asset_calendar_map = {a.unique_identifier: a.get_calendar().name for a in universe_assets}
+    asset_calendar_map = {uid: 'XNYS' for uid in initial_uids}
+
+    def _norm_cal_code(c: str) -> str:
+        return c.upper().replace("ARCA", "XNYS").replace("AMEX", "XNYS")
+
+    assets_by_cal = defaultdict(list)
+    for uid, cal_name in asset_calendar_map.items():
+        assets_by_cal[_norm_cal_code(cal_name)].append(uid)
+
+    present_pts, expected_pts, missing_rows, present_series_list, expected_series_list = defaultdict(int), defaultdict(
+        int), [], [], []
+    open_missing_start, open_missing_len, last_missing_ts = {}, defaultdict(int), {}
+
+    uid_minima=None
+    if use_minimals:
+        global_minima,uid_minima=data_node.data_source.related_resource.get_earliest_value(local_metadata=data_node.local_time_serie)
+
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        ranges = list(_iterate_time_ranges(start, end_excl, chunk_size))
+        for b_start, b_end_excl in tqdm(ranges, desc="calendar-missingness"):
+            df = data_node.get_df_between_dates(start_date=b_start, end_date=b_end_excl,
+                                                unique_identifier_list=initial_uids, columns=column_filter)
+            times_by_asset = defaultdict(list)
+            if df is not None and not df.empty:
+                for ts, uid in df.index.to_flat_index(): times_by_asset[uid].append(ts)
+
+            futures = {
+                executor.submit(_process_calendar_chunk, cal_code, uids, b_start, b_end_excl, step, times_by_asset,
+                                {k: v for k, v in open_missing_start.items() if k in uids},
+                                defaultdict(int, {k: v for k, v in open_missing_len.items() if k in uids}),
+                                {k: v for k, v in last_missing_ts.items() if k in uids}, emit_time_summary,uid_minima): cal_code
+                for cal_code, uids in assets_by_cal.items()}
+            for future in as_completed(futures):
+                result = future.result()
+                if result.get('status') == 'success':
+                    # (cal_code = futures[future])  # only needed for logging
+
+                    # Per-UID totals (present / expected)
+                    for uid, cnt in result['present_counts'].items():
+                        present_pts[uid] += int(cnt)
+                    for uid, cnt in result.get('expected_counts', {}).items():
+                        expected_pts[uid] += int(cnt)
+
+                    # Missing windows
+                    for row in result['missing_rows']:
+                        _record_missing_points(rows=missing_rows, step=step, **row)
+
+                    # Carry open runs over chunk boundary
+                    open_missing_start.update(result['open_missing_start'])
+                    open_missing_len.update(result['open_missing_len'])
+                    last_missing_ts.update(result['last_missing_ts'])
+
+                    # Time summaries
+                    if emit_time_summary:
+                        if not result['s_present'].empty:
+                            present_series_list.append(result['s_present'])
+                        if not result['s_expected'].empty:
+                            expected_series_list.append(result['s_expected'])
+
+    for uid, start_ts in list(open_missing_start.items()):
+        if start_ts is not None and last_missing_ts.get(uid) is not None:
+            _record_missing_points(rows=missing_rows, uid=uid, start=start_ts, end=last_missing_ts[uid],
+                                   num_points=open_missing_len.get(uid, 0), step=step)
+
+    if missing_rows:
+        missing_runs = pd.DataFrame(missing_rows).sort_values(["unique_identifier", "missing_start"]).reset_index(
+            drop=True)
+        missing_runs["missing_start"] = pd.to_datetime(missing_runs["missing_start"], utc=True)
+        missing_runs["missing_end"] = pd.to_datetime(missing_runs["missing_end"], utc=True)
+        missing_runs["missing_start_day"] = missing_runs["missing_start"].dt.day_name()
+        missing_runs["missing_end_day"] = missing_runs["missing_end"].dt.day_name()
+    else:
+        missing_runs = pd.DataFrame(
+            columns=["unique_identifier", "missing_start", "missing_end", "expected_points", "duration",
+                     "missing_start_day", "missing_end_day"])
+
+    if not missing_runs.empty:
+        missing_windows = missing_runs.groupby(["missing_start", "missing_end"], as_index=False).agg(
+            assets_missing=("unique_identifier", "nunique"), expected_points=("expected_points", "first"),
+            duration=("duration", "first")).sort_values(["missing_start", "missing_end"])
+        missing_windows["start_day"] = missing_windows["missing_start"].dt.day_name()
+        missing_windows["end_day"] = missing_windows["missing_end"].dt.day_name()
+    else:
+        missing_windows = pd.DataFrame(
+            columns=["missing_start", "missing_end", "assets_missing", "expected_points", "duration", "start_day",
+                     "end_day"])
+
+    present_s = pd.Series(present_pts, name="present_points", dtype=int)
+    expected_s = pd.Series(expected_pts, name="expected_points", dtype=int)
+
+    # Combine into a single DataFrame, filling missing values with 0
+    asset_coverage = pd.concat([present_s, expected_s], axis=1).fillna(0).astype(int)
+
+    if emit_time_summary:
+        if expected_series_list:
+            expected_by_time = pd.concat(expected_series_list).groupby(level=0).sum().sort_index()
+        else:
+            expected_by_time = pd.Series(dtype="int64", name="expected_assets")
+        if present_series_list:
+            present_by_time = pd.concat(present_series_list).groupby(level=0).sum().sort_index()
+        else:
+            present_by_time = pd.Series(dtype="int64", name="present_assets")
+
+        summary_by_time = pd.DataFrame({"expected_assets": expected_by_time})
+        summary_by_time["present_assets"] = present_by_time.reindex(summary_by_time.index, fill_value=0)
+        summary_by_time["missing_assets"] = summary_by_time["expected_assets"] - summary_by_time["present_assets"]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            summary_by_time["coverage_ratio"] = summary_by_time["present_assets"] / summary_by_time["expected_assets"]
+        summary_by_time.index.name = "time_index"
+    else:
+        summary_by_time = pd.DataFrame(
+            columns=["present_assets", "expected_assets", "missing_assets", "coverage_ratio"])
+        summary_by_time.index.name = "time_index"
+
+    return MissingnessResult(missing_runs=missing_runs, summary_by_time=summary_by_time, asset_coverage=asset_coverage,
+                             missing_windows=missing_windows,uid_minima=uid_minima)
+
+
+
+
+def analyze_missing_data_in_table(data_node: DataNode,start_date: dt.datetime, frequency,
+                                  chunk_size:dt.timedelta=dt.timedelta(days=90),
+                                  num_workers=1,use_minimals=True) -> MissingnessResult:
+    from data_connectors.helpers.asset_consistency import analyze_missing_data
+
+    update_stats = data_node.local_persist_manager.metadata.sourcetableconfiguration.get_data_updates()
+    update_stats._initial_fallback_date = data_node.OFFSET_START
+    last_update_in_list = update_stats.get_max_time_in_update_statistics()
+
+    results = analyze_missing_data(
+        data_node,
+        start_date=start_date,
+        end_date=last_update_in_list,
+        frequency=frequency,
+        asset_universe=None,
+        chunk_size=chunk_size,
+        column_filter=["close"],
+        num_workers=num_workers,
+        use_minimals=use_minimals,
+    )
+
+    return results
+
 def update_calendar_holes(data_node:DataNode,start_date:dt.datetime,
-                          frequency) -> None:
+                          frequency,chunk_size:dt.timedelta=dt.timedelta(days=90),
+                          num_workers=1) -> None:
 
     """
 
     """
 
     #1 Get Price Summary
-    from data_connectors.helpers.asset_consistency import analyze_missing_prices
+    results=analyze_missing_data_in_table(data_node=data_node,start_date=start_date,frequency=frequency,
+                                          use_minimals=True,
+                                          chunk_size=chunk_size,num_workers=num_workers)
 
-
-    update_stats=data_node.local_persist_manager.metadata.sourcetableconfiguration.get_data_updates()
-    update_stats._initial_fallback_date=data_node.OFFSET_START
-    last_update_in_list=update_stats.get_max_time_in_update_statistics()
-
-
-
-    results = analyze_missing_prices(
-        data_node,
-        start_date=start_date,
-        end_date=last_update_in_list,
-        frequency=frequency,
-        asset_universe=None,
-        chunk_size=dt.timedelta(days=90),
-        column_filter=["close"],
-    )
-
-
-    relevant_assets=msc.Asset.filter(unique_identifier__in=results.missing_runs.unique_identifier.tolist())
+    relevant_assets=msc.Asset.filter(unique_identifier__in=results.missing_runs.unique_identifier.unique().tolist())
     uid_ticker_map={a.unique_identifier:a.ticker for a in relevant_assets}
     results.missing_runs["ticker"]=results.missing_runs["unique_identifier"].map(uid_ticker_map)
 
     missing_runs=results.missing_runs
     missing_windows=results.missing_windows
+
+
+    #filter minute misseing
+    missing_windows=missing_windows[missing_windows.duration.dt.total_seconds()>60]
+    missing_windows=missing_windows.sort_values(["expected_points","assets_missing"])
+    missing_windows=missing_windows.sort_values(["expected_points", "assets_missing"], ascending=False)
+
     for _,row in missing_windows.iterrows():
 
         asset_in_row=missing_runs[(missing_runs.missing_start==row.missing_start)
@@ -578,10 +496,12 @@ def update_calendar_holes(data_node:DataNode,start_date:dt.datetime,
         tmp_update_stats.asset_time_statistics={k:row.missing_start-dt.timedelta(days=1) for k in tmp_update_stats.asset_time_statistics.keys()}
         tmp_update_stats.max_time_index_value=row.missing_end
         tmp_update_stats.is_backfill=True
-
+        #todo:data_node needs to be rebuild from configuration to avoid state settings
         error_on_last_update,updated_df=data_node.run(debug_mode=True,force_update=True,override_update_stats=tmp_update_stats)
 
         a=5
+
+
 
 # fmt: on
 

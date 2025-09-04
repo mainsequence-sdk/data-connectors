@@ -5,7 +5,7 @@ from tqdm import tqdm
 import os
 
 
-from zipfile import ZipFile
+from zipfile import ZipFile,BadZipFile
 
 import time
 import os
@@ -224,11 +224,17 @@ def _infer_epoch_per_second(times_arr: np.ndarray) -> int:
 
 _EPOCH_UNIT_STR = {1:'s', 1_000:'ms', 1_000_000:'us', 1_000_000_000:'ns'}
 
+from data_connectors.helpers.s3_utils import (is_s3_uri, cached_s3_fetch, S3Config,
+                                              upload_file_to_s3,delete_s3_object_if_exists,
+                                              purge_invalid_zips_under_prefix)
+
+
+
 def get_bars_by_date_optimized(url, file_root, bars_frequency,
                                api_source: str, logger=None, chunksize=1_000_000,
                                max_retries: int = 3, timeout_seconds: int = 600,
                                ):
-    from data_connectors.helpers.s3_utils import is_s3_uri, cached_s3_fetch, S3Config,upload_file_to_s3
+
 
     if logger is None:
         logger = FakeLogger()
@@ -309,7 +315,9 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
 
         if response is None:
             raise Exception
-
+        if response.status_code!=200:
+            #only case when we return an empyt df to dont stop update
+            return pd.DataFrame()
         if local_path:
             if is_s3_uri(local_path):
                 # Write HTTP response to a local tmp, upload to S3 cache, then read from the tmp
@@ -419,18 +427,20 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
                     except Exception as e:
                         raise e
                     chunk.dropna(subset=['time'], inplace=True)
-                    if chunk.empty: continue
+                    if chunk.empty: raise Exception("No data found")
 
                     # Ensure all relevant columns are numeric, coercing errors
                     for col in ["price", "qty", "quoteQty"]:
+
                         chunk[col] = pd.to_numeric(chunk[col], errors='coerce')
 
                     if chunk["isBuyerMaker"].dtype == 'object':
-                        chunk["isBuyerMaker"] = pd.to_numeric(chunk["isBuyerMaker"], errors='coerce')
+                        s = chunk["isBuyerMaker"].astype("string").str.strip().str.lower()
+                        chunk["isBuyerMaker"] = s.map({"true": 1, "false": 0}).astype("Int8")
 
-                    # Drop any rows where key data might be missing after coercion
+                        # Drop any rows where key data might be missing after coercion
                     chunk.dropna(subset=["price", "qty", "quoteQty", "isBuyerMaker"], inplace=True)
-                    if chunk.empty: continue
+                    if chunk.empty: raise Exception("No data found")
 
                     times_arr, prices_arr, qtys_arr, quote_qtys_arr,is_buyer_maker_arr = (
                         chunk["time"].to_numpy(dtype=np.int64),
@@ -453,9 +463,34 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
                         trade_ids_arr,
                         bar_id_map, global_agg_values
                     )
+    except BadZipFile as e:
+        # Specific handling for "not a zip" / corrupt archives
+        logger.exception(f"Corrupt/invalid zip from {url}: {e}")
+
+        # If we were using an S3 cache path, remove the bad object so the next run can re-fetch.
+        if local_path and is_s3_uri(local_path):
+            # target_path is already computed above (s3://bucket/prefix/<filename>.zip)
+            delete_s3_object_if_exists(uri=target_path, logger=logger)
+            purge_invalid_zips_under_prefix(
+                local_path+"/",
+                deep=False,  # set True to CRC-scan entries (slower)
+                dry_run=True,  # preview first
+                include_all=False  # only *.zip by default
+            )
+
+        # Also delete any local tmp/cached file we created so it isn't reused.
+        if isinstance(zip_source, str) and os.path.exists(zip_source):
+            try:
+                os.remove(zip_source)
+                logger.info(f"Removed local corrupt cache file: {zip_source}")
+            except OSError as rm_err:
+                logger.warning(f"Failed to remove local cache {zip_source}: {rm_err}")
+
+        # Preserve existing behavior (surface the failure to the caller)
+        raise
     except Exception as e:
         logger.exception(f"Failed to process zip file from {url}: {e}")
-        return pd.DataFrame()
+        raise e
     finally:
         # remove temp file created only to read (S3 upload case)
         if cleanup_tmp_after_read and isinstance(zip_source, str) and os.path.exists(cleanup_tmp_after_read):
@@ -463,7 +498,7 @@ def get_bars_by_date_optimized(url, file_root, bars_frequency,
                 os.remove(cleanup_tmp_after_read)
             except OSError:
                 pass
-    if not bar_id_map: return pd.DataFrame()
+    if not bar_id_map: raise Exception("Error reading data")
 
     # --- Final DataFrame Construction ---
     final_size = len(bar_id_map)

@@ -200,6 +200,60 @@ def cached_s3_fetch(
 
 # ---------- Upload (write) ----------
 
+
+def delete_s3_object_if_exists(
+    uri: str,
+    *,
+    s3_config: Optional["S3Config"] = None,
+    s3_client: Optional["Minio"] = None,
+    version_id: Optional[str] = None,
+    logger=None,
+) -> bool:
+    """
+    Best-effort delete of a single S3 object using the same auth/client pattern
+    as `upload_file_to_s3`. Returns True if a delete was attempted and reported
+    success; False if the object/bucket didn't exist or on failure.
+
+    Parameters
+    ----------
+    uri : str
+        Full S3 URI: s3://<bucket>/<key>
+    s3_config : S3Config | None
+        If None, S3Config.from_env() is used.
+    s3_client : Minio | None
+        Reuse an existing MinIO client; otherwise one is created from s3_config.
+    version_id : str | None
+        Optional version ID (for versioned buckets).
+    logger : object | None
+        Optional logger with .info/.warning methods.
+    """
+    try:
+        if not uri or not is_s3_uri(uri):
+            if logger: logger.info(f"[S3 delete] Skipped non-S3 URI: {uri!r}")
+            return False
+
+        bucket, key = parse_s3_uri(uri)
+        client = s3_client or (s3_config.client() if s3_config else S3Config.from_env().client())
+
+        # Perform delete (version-aware)
+        client.remove_object(bucket, key, version_id=version_id)  # type: ignore[arg-type]
+        if logger:
+            suffix = f" (version_id={version_id})" if version_id else ""
+            logger.warning(f"[S3 delete] Deleted s3://{bucket}/{key}{suffix}")
+        return True
+
+    except S3Error as e:
+        code = (getattr(e, "code", "") or "").lower()
+        # Treat missing object/bucket as a no-op success
+        if code in {"nosuchkey", "objectnotfound", "nosuchobject", "nosuchbucket", "notfound", "nosuchversion"}:
+            if logger: logger.info(f"[S3 delete] Already gone: {uri} ({e.code})")
+            return False
+        if logger: logger.warning(f"[S3 delete] Failed to delete {uri}: {e}")
+        return False
+    except Exception as e:
+        if logger: logger.warning(f"[S3 delete] Failed to delete {uri}: {e}")
+        return False
+
 def upload_file_to_s3(
     uri: str,
     local_path: str | Path,
@@ -358,3 +412,230 @@ def _parse_iso(s: Optional[str]) -> Optional[datetime]:
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except Exception:
         return None
+
+
+
+import os
+import tempfile
+import logging
+import zipfile
+from typing import Optional, Sequence, Dict, Any
+
+from minio import Minio
+from minio.error import S3Error
+
+# --- Your existing helpers ---
+from data_connectors.helpers.s3_utils import is_s3_uri, S3Config
+
+# If you already have parse_s3_uri in s3_utils, import it; otherwise, fallback below.
+try:
+    from data_connectors.helpers.s3_utils import parse_s3_uri  # (bucket, key/prefix)
+except Exception:
+    from urllib.parse import urlparse
+    def parse_s3_uri(uri: str):
+        p = urlparse(uri)
+        if p.scheme != "s3":
+            raise ValueError(f"Not an s3 URI: {uri}")
+        return p.netloc, p.path.lstrip("/")
+
+# Import the delete helper you provided (adjust path as needed).
+# If you placed it in s3_utils next to upload_file_to_s3, import from there.
+from data_connectors.helpers.s3_utils import delete_s3_object_if_exists  # <-- adjust if different
+
+
+# ------------- Zip helpers -------------
+
+ZIP_MAGIC_SET = {b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"}  # normal, empty, spanned
+
+def _has_zip_magic(header4: bytes) -> bool:
+    return header4 in ZIP_MAGIC_SET
+
+def _is_valid_zipfile(path: str, deep: bool = False) -> bool:
+    """
+    Structural check: open and read central directory (ZipFile + infolist()).
+    Deep check: zf.testzip() to CRC-scan entries (slower).
+    """
+    try:
+        with zipfile.ZipFile(path, "r") as zf:
+            _ = zf.infolist()
+            if deep:
+                return zf.testzip() is None
+            return True
+    except zipfile.BadZipFile:
+        return False
+    except Exception:
+        # Treat unexpected failures as invalid to be conservative
+        return False
+
+
+# ------------- MinIO/S3 client helpers -------------
+
+
+def _first4_bytes(client: "Minio", bucket: str, key: str, logger=None) -> bytes:
+    """
+    Fetch the first four bytes using a ranged GET (offset=0, length=4).
+    Returns b"" for empty objects.
+    """
+    resp = None
+    try:
+        resp = client.get_object(bucket, key, offset=0, length=4)
+        data = resp.read(4)  # should be <= 4 bytes
+        return data or b""
+    except S3Error as e:
+        # Missing object, permission, etc. -> bubble up to caller to count as error
+        if logger: logger.warning(f"[head] {bucket}/{key}: {e}")
+        raise
+    except Exception as e:
+        if logger: logger.warning(f"[head] {bucket}/{key}: {e}")
+        raise
+    finally:
+        if resp is not None:
+            try:
+                resp.close(); resp.release_conn()
+            except Exception:
+                pass
+
+def _download_to_temp(client: "Minio", bucket: str, key: str) -> str:
+    """
+    Stream object to a temporary file. Caller must remove the file.
+    """
+    resp = None
+    tf = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        resp = client.get_object(bucket, key)
+        with open(tf.name, "wb") as fh:
+            for chunk in resp.stream(32 * 1024):
+                fh.write(chunk)
+        return tf.name
+    except Exception:
+        try: os.remove(tf.name)
+        except OSError: pass
+        raise
+    finally:
+        if resp is not None:
+            try:
+                resp.close(); resp.release_conn()
+            except Exception:
+                pass
+
+
+# ------------- Main API -------------
+
+def purge_invalid_zips_under_prefix(
+    uri_prefix: str,
+    *,
+    s3_config: Optional["S3Config"] = None,
+    s3_client: Optional["Minio"] = None,
+
+    deep: bool = False,
+    dry_run: bool = True,
+    include_all: bool = False,
+    only_extensions: Optional[Sequence[str]] = (".zip", ".ZIP"),
+    logger=None,
+) -> Dict[str, Any]:
+    """
+    Scan s3://<bucket>/<prefix> and delete any object that is not a valid ZIP.
+
+    Auth/client pattern matches upload_file_to_s3:
+      client = (s3_client) or (s3_config.client()) or (S3Config.from_env().client())
+
+    Parameters
+    ----------
+    uri_prefix : str
+        s3 URI representing the "folder" (prefix), e.g. s3://my-bucket/path/to/folder/
+    s3_config : S3Config | None
+        If None, S3Config.from_env() is used.
+    s3_client : Minio | None
+        Reuse an existing MinIO client if already created elsewhere.
+    deep : bool
+        If True, CRC‑scan all entries in the zip (slower but thorough).
+    dry_run : bool
+        If True, log intended deletions without removing objects.
+    include_all : bool
+        If True, scan all objects regardless of extension.
+    only_extensions : tuple[str] | None
+        If not None and include_all is False, only keys with these suffixes are considered zips.
+    logger : object | None
+        Logger with .info/.warning/.debug methods; if None, uses `logging`.
+
+    Returns
+    -------
+    dict with summary counts: {"total": int, "kept": int, "deleted": int, "errors": int}
+    """
+    log = logger or logging.getLogger(__name__)
+
+    if not is_s3_uri(uri_prefix):
+        raise ValueError(f"Expected s3:// uri prefix, got: {uri_prefix!r}")
+
+    bucket, prefix = parse_s3_uri(uri_prefix)
+    client = s3_client or (s3_config.client() if s3_config else S3Config.from_env().client())
+
+    total = kept = deleted = errors = 0
+
+    # list_objects is recursive when recursive=True
+    for obj in client.list_objects(bucket, prefix=prefix, recursive=True):
+        key = obj.object_name
+        size = getattr(obj, "size", None)
+        # Skip directory markers
+        if key.endswith("/") and (size in (0, None)):
+            continue
+
+        total += 1
+
+        # Optional extension filter (unless include_all is True)
+        if not include_all and only_extensions:
+            if not key.lower().endswith(tuple(ext.lower() for ext in only_extensions)):
+                log.debug(f"[skip-ext] s3://{bucket}/{key}")
+                kept += 1
+                continue
+
+        try:
+            header = _first4_bytes(client, bucket, key, logger=log)
+            if not _has_zip_magic(header):
+                msg = f"NOT ZIP (magic) -> delete s3://{bucket}/{key} (size={size})"
+                if dry_run:
+                    log.info("[DRY-RUN] %s", msg)
+                else:
+                    delete_s3_object_if_exists(
+                        f"s3://{bucket}/{key}",
+                        s3_config=s3_config,
+                        s3_client=client,
+                        logger=log,
+                    )
+                    log.info(msg)
+                deleted += 1
+                continue
+
+            # Looks like a zip: structural/deep validation
+            tmp_path = _download_to_temp(client, bucket, key)
+            try:
+                if _is_valid_zipfile(tmp_path, deep=deep):
+                    kept += 1
+                    log.debug(f"[ok-zip] s3://{bucket}/{key}")
+                else:
+                    msg = f"INVALID ZIP -> delete s3://{bucket}/{key} (size={size})"
+                    if dry_run:
+                        log.info("[DRY-RUN] %s", msg)
+                    else:
+                        delete_s3_object_if_exists(
+                            f"s3://{bucket}/{key}",
+                            s3_config=s3_config,
+                            s3_client=client,
+                            logger=log,
+                        )
+                        log.info(msg)
+                    deleted += 1
+            finally:
+                try: os.remove(tmp_path)
+                except OSError: pass
+
+        except S3Error as e:
+            errors += 1
+            log.warning(f"[error] s3://{bucket}/{key}: {e}")
+        except Exception as e:
+            errors += 1
+            log.warning(f"[error] s3://{bucket}/{key}: {e}")
+
+    summary = {"total": total, "kept": kept, "deleted": deleted, "errors": errors}
+    log.info("S3/MinIO scan complete: %s", summary)
+    return summary
