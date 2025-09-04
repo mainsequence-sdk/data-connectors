@@ -477,7 +477,7 @@ def update_calendar_holes(data_node:DataNode,start_date:dt.datetime,
 
 
     #filter minute misseing
-    missing_windows=missing_windows[missing_windows.duration.dt.total_seconds()>60]
+    missing_windows=missing_windows[missing_windows.duration.dt.total_seconds()>60*60*48]
     missing_windows=missing_windows.sort_values(["expected_points","assets_missing"])
     missing_windows=missing_windows.sort_values(["expected_points", "assets_missing"], ascending=False)
 

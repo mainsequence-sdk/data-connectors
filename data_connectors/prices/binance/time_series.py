@@ -575,9 +575,10 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
         # Frequency is fixed to 1 minute for this data source
         super().__init__(*args, **kwargs     )
 
-    def _get_url_and_root_for_chunk(self, symbol_info: dict, chunk_date: datetime.datetime) -> tuple[str, str]:
+    def _get_url_and_root_for_chunk(self, symbol_info: dict, chunk_date: datetime.datetime,
+                                    is_daily:bool
+                                    ) -> tuple[str, str]:
         """Constructs the download URL and file root for a specific chunk's trades."""
-        is_daily = (datetime.datetime.now().date() - chunk_date.date()).days <= 33
         api_source = symbol_info["api_source"]
         binance_symbol = symbol_info["binance_symbol"]
 
@@ -593,11 +594,19 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
 
     def get_table_metadata(self) -> Optional[ms_client.TableMetaData]:
 
-        identifier = f"binance_{self.bar_configuration.frequency_id}_bars"
+
+        if isinstance(self.bar_configuration, TimeBarConfig):
+
+            identifier = f"binance_{self.bar_configuration.frequency_id}_bars"
+            description = f"Binance {self.bar_configuration.frequency_id}  include vwap from trades"
+            data_frequency_id = DataFrequency(self.bar_configuration.frequency_id)
+        else:
+            raise NotImplementedError
+
         return ms_client.TableMetaData(
             identifier=identifier,
-            description=f"Binance {self.bar_configuration.frequency_id}  include vwap from trades",
-            data_frequency_id=DataFrequency(self.bar_configuration.frequency_id),
+            description=description,
+            data_frequency_id=data_frequency_id
         )
 
 
@@ -612,8 +621,13 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
         # Intelligent Chunking Logic
         processing_chunks = []
         processed_months = set()
+
+        limit_for_check=datetime.datetime.now().date()
+        if self.update_statistics.limit_update_time is not None:
+            limit_for_check=self.update_statistics.limit_update_time.date()
+
         for day in date_range:
-            is_daily = (datetime.datetime.now().date() - day.date()).days <= 33
+            is_daily = ( limit_for_check- day.date()).days <= 120
             if is_daily:
                 processing_chunks.append(day)
             else:
@@ -623,10 +637,10 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
                     processed_months.add(month_key)
 
         for chunk_date in tqdm(processing_chunks, desc=f"Processing {uid}", leave=False):
-            url, file_root = self._get_url_and_root_for_chunk(symbol_info, chunk_date)
+            url, file_root = self._get_url_and_root_for_chunk(symbol_info, chunk_date,
+                                                              is_daily=is_daily)
 
-            # if "ONDOUSDT-trades-2025-04" not in url:
-            #     continue
+
 
             if isinstance(self.bar_configuration, TimeBarConfig):
                 try:

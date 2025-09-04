@@ -5,6 +5,10 @@ from data_connectors.utils import register_rules
 
 def create_asset_translation_table():
 
+
+
+
+
     # --- ALPACA ---
     translation_table_identifier = f"prices_translation_table_1d"
     markets_time_series_identifier = f"alpaca_1d_bars"
@@ -39,6 +43,7 @@ def create_asset_translation_table():
 
 
     # --- BINANCE ---
+    #daily
     translation_table_identifier = f"prices_translation_table_1d"
 
     rules = [
@@ -55,6 +60,22 @@ def create_asset_translation_table():
         rules,
     )
 
+    #1 minute
+    translation_table_identifier = f"prices_translation_table_1min"
+
+    rules = [
+        AssetTranslationRule(
+            asset_filter=AssetFilter(
+                security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
+            ),
+            markets_time_serie_unique_identifier="binance_1d_bars",
+        ),
+    ]
+
+    register_rules(
+        translation_table_identifier,
+        rules,
+    )
 
     # --- MARKET CAP ---
     translation_table_identifier = "marketcap_translation_table"
