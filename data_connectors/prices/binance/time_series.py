@@ -190,8 +190,7 @@ class BaseBinanceEndpoint(DataNode):
                 currency_pair__id__in=[a.id for a in spot_assets],
                 current_snapshot__exchange_code=MARKETS_CONSTANTS.BINANCE_FUTURES_EV_SYMBOL,
             )
-            # return binance_futures+binance_currency_pairs
-            self.logger.warning("Only using currency pair for now due to timeouts in updating - add futures later")
+
             return spot_assets + future_assets
 
         return self.asset_list
@@ -308,7 +307,7 @@ class BaseBinanceEndpoint(DataNode):
             n_jobs = 1
 
         results = Parallel(n_jobs=n_jobs)(
-            delayed(self._process_single_asset)(uid, date_range,self.logger)
+            delayed(self._process_single_asset)(uid, date_range,self.logger,limit_update_time=self.update_statistics.limit_update_time)
             for uid, date_range in update_ranges.items()
         )
 
@@ -610,7 +609,8 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
         )
 
 
-    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex,logger) -> pd.DataFrame:
+    def _process_single_asset(self, uid: str, date_range: pd.DatetimeIndex,logger,
+                              limit_update_time:datetime.datetime) -> pd.DataFrame:
         """
         Orchestrates fetching raw trades and aggregating them into bars based on the bar_config.
         """
@@ -623,11 +623,11 @@ class BinanceBarsFromTrades(BaseBinanceEndpoint):
         processed_months = set()
 
         limit_for_check=datetime.datetime.now().date()
-        if self.update_statistics.limit_update_time is not None:
-            limit_for_check=self.update_statistics.limit_update_time.date()
+        if limit_update_time is not None:
+            limit_for_check=limit_update_time.date()
 
         for day in date_range:
-            is_daily = ( limit_for_check- day.date()).days <= 120
+            is_daily = ( limit_for_check- day.date()).days <= 33
             if is_daily:
                 processing_chunks.append(day)
             else:
