@@ -54,56 +54,64 @@ class ImportValmer(DataNode):
         Reads all artifacts from the bucket, normalizes columns, and concatenates them into a single DataFrame.
         Optionally filters for new artifacts based on the 'process_all_files' flag.
         """
-        if self.artifact_data is not None:
-            return self.artifact_data
+        import os
+        debug_artifact_path=os.environ.get("DEBUG_ARTIFACT_PATH",None)
+        if debug_artifact_path:
+            df = pd.read_excel(debug_artifact_path, engine="xlrd")
+            sorted_artifacts=[df]
+        else:
 
-        artifacts = Artifact.filter(bucket__name=self.bucket_name)
-        sorted_artifacts = sorted(artifacts, key=lambda artifact: artifact.name)
+            if self.artifact_data is not None:
+                return self.artifact_data
 
-        self.logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{self.bucket_name}'.")
+            artifacts = Artifact.filter(bucket__name=self.bucket_name)
+            sorted_artifacts = sorted(artifacts, key=lambda artifact: artifact.name)
 
-        # --- Conditional processing based on process_all_files flag ---
-        artifact_dates = []
-        for artifact in sorted_artifacts:
-            match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
-            if match:
-                artifact_dates.append(pd.to_datetime(match.group(1), utc=True))
-            else:
-                raise ValueError(f"No date found for prices xls with name {artifact.name}")
+            self.logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{self.bucket_name}'.")
 
-        latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
-        if latest_date:
-            self.logger.info(f"Filtering artifacts newer than {latest_date}.")
-            sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date > latest_date]
+            # --- Conditional processing based on process_all_files flag ---
+            artifact_dates = []
+            for artifact in sorted_artifacts:
+                match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
+                if match:
+                    artifact_dates.append(pd.to_datetime(match.group(1), utc=True))
+                else:
+                    raise ValueError(f"No date found for prices xls with name {artifact.name}")
 
-        sorted_artifacts = sorted_artifacts[:1]
+            latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
+            if latest_date:
+                self.logger.info(f"Filtering artifacts newer than {latest_date}.")
+                sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date > latest_date]
 
-        self.logger.info(f"Processing {len(sorted_artifacts)} artifacts...")
-        if not sorted_artifacts:
-            self.logger.info("No new artifacts to process. Task finished.")
-            return pd.DataFrame()
+            sorted_artifacts = sorted_artifacts[:1]
+
+            self.logger.info(f"Processing {len(sorted_artifacts)} artifacts...")
+            if not sorted_artifacts:
+                self.logger.info("No new artifacts to process. Task finished.")
+                return pd.DataFrame()
 
         frames = []
         for artifact in tqdm(sorted_artifacts):
-            name_l = artifact.name.lower()
-            content = artifact.content
-            buf = content
+            if isinstance(artifact, msc.Artifact):
+                name_l = artifact.name.lower()
+                content = artifact.content
+                buf = content
 
-            df = None
-            if name_l.endswith(".xls"):
-                import xlrd  # noqa: F401
-                df = pd.read_excel(buf, engine="xlrd")
-            elif name_l.endswith(".csv"):
-                try:
-                    df = pd.read_csv(buf, encoding="latin1", engine="pyarrow")
-                except Exception:
-                    df = pd.read_csv(buf, encoding="latin1", low_memory=False)
-            else:
-                self.logger.info(f"Skipping unsupported file type: {artifact.name}")
-                continue
+                df = None
+                if name_l.endswith(".xls"):
+                    import xlrd  # noqa: F401
+                    df = pd.read_excel(buf, engine="xlrd")
+                elif name_l.endswith(".csv"):
+                    try:
+                        df = pd.read_csv(buf, encoding="latin1", engine="pyarrow")
+                    except Exception:
+                        df = pd.read_csv(buf, encoding="latin1", low_memory=False)
+                else:
+                    self.logger.info(f"Skipping unsupported file type: {artifact.name}")
+                    continue
 
-            if df is None or df.empty:
-                continue
+                if df is None or df.empty:
+                    continue
 
             # Normalize all column names
             df.columns = [self._normalize_column_name(col) for col in df.columns]
@@ -256,17 +264,5 @@ class ImportValmer(DataNode):
         return meta
 
 
-if __name__ == "__main__":
-    BUCKET_NAME = "Vector de precios"
 
-
-    for i in range(360//5):
-        ts_all_files = ImportValmer(
-            bucket_name=BUCKET_NAME,
-        )
-
-        ts_all_files.run(
-            debug_mode=True,
-            force_update=True,
-        )
 

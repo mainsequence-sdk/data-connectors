@@ -22,6 +22,23 @@ class TestTimeSerie(DataNode):
         )
         return full_data
 
+def test_valmer():
+    from data_connectors.prices.valmer.time_series import ImportValmer
+    BUCKET_NAME = "Vector de precios"
+
+
+    for i in range(360//5):
+        ts_all_files = ImportValmer(
+            bucket_name=BUCKET_NAME,
+        )
+
+        ts_all_files.run(
+            debug_mode=True,
+            force_update=True,
+        )
+
+        a=5
+
 
 def test_binance_bars_from_trades(bar_type="time"):
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades,TimeBarConfig,ImbalanceBarConfig
@@ -155,7 +172,8 @@ def test_banxico_mbonos():
 # test_crypto_market_cap()
 # test_equity_market_cap()
 # test_binance_daily_bars()
-test_alpaca_bars()
+# test_alpaca_bars()
+test_valmer()
 # test_alpaca_bars_small()
 # test_banxico_mbonos()
 # test_databento_bars_small()
