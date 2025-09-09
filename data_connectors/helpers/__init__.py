@@ -1,1 +1,1 @@
-from .asset_consistency import update_calendar_holes
+from .asset_consistency import update_calendar_holes,analyze_missing_data_in_table

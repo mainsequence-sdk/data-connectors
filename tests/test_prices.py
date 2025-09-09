@@ -56,7 +56,7 @@ def test_alpaca_bars():
     from data_connectors.helpers import update_calendar_holes
     from mainsequence.client import  Asset
     ts = AlpacaEquityBars( asset_list=None,frequency_id="1d", adjustment="all")
-    # update_calendar_holes(data_node=ts,start_date=ts.OFFSET_START)
+    update_calendar_holes(data_node=ts,start_date=ts.OFFSET_START,frequency="1d")
     ts.run(debug_mode=True,
 
            force_update=True)
