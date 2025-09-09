@@ -216,6 +216,30 @@ class ImportValmer(DataNode):
         ohlc_df['close'] = price_series
         ohlc_df['volume'] = 0
         ohlc_df['open_time'] = ohlc_df['time_index'].astype(np.int64) // 10 ** 9
+        ohlc_df['preciolimpio']= pd.to_numeric(source_data['preciolimpio'], errors='coerce')
+        ohlc_df['duracion'] =  pd.to_numeric(source_data['duracion'], errors='coerce')
+
+        #This should be in a snapshot table to optimye space
+        ohlc_df['calificacionfitch'] = source_data['calificacionfitch']
+        ohlc_df['fechavcto'] =pd.to_datetime(source_data['fechavcto'], errors='coerce').apply(
+            lambda x: x.timestamp() if pd.isna(x) == False else None
+        )
+        ohlc_df['monedaemision'] = source_data['monedaemision']
+        ohlc_df['sector'] = source_data['sector']
+        ohlc_df['nombrecompleto'] = source_data['nombrecompleto']
+
+
+        ohlc_df['diastransccpn'] = source_data['diastransccpn']
+        ohlc_df['tasacupon'] =pd.to_numeric(source_data['tasacupon'], errors='coerce')
+        ohlc_df['cuponesxcobrar'] = pd.to_numeric(source_data['cuponesxcobrar'], errors='coerce')
+        ohlc_df['valornominal'] = pd.to_numeric(source_data['valornominal'], errors='coerce')
+        ohlc_df['reglacupon'] = source_data['reglacupon'].astype(str)
+        ohlc_df['freccpn'] =  source_data['freccpn'].astype(str)
+        ohlc_df['cuponactual'] = pd.to_numeric(source_data['cuponactual'], errors='coerce')
+        ohlc_df['sobretasa'] = pd.to_numeric(source_data['sobretasa'], errors='coerce')
+
+
+
 
         ohlc_df.set_index(["time_index", "unique_identifier"], inplace=True)
         ohlc_df = self.update_statistics.filter_df_by_latest_value(ohlc_df)
@@ -235,10 +259,14 @@ class ImportValmer(DataNode):
 if __name__ == "__main__":
     BUCKET_NAME = "Vector de precios"
 
-    ts_all_files = ImportValmer(
-        bucket_name=BUCKET_NAME,
-    )
-    ts_all_files.run(
-        debug_mode=True,
-        force_update=True,
-    )
+
+    for i in range(360//5):
+        ts_all_files = ImportValmer(
+            bucket_name=BUCKET_NAME,
+        )
+
+        ts_all_files.run(
+            debug_mode=True,
+            force_update=True,
+        )
+
