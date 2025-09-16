@@ -15,6 +15,7 @@ from mainsequence.tdag import DataNode
 from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
 import numpy as np
 import os
+import time
 UTC = pytz.utc
 
 # -----------------------------
@@ -44,6 +45,16 @@ BONOS_SERIES: Dict[str, Dict[str, str]] = {
 
 FUNDING_RATES={"1d":"SF331451"}
 
+
+
+MONEY_MARKET_RATES={"target_rate":"SF61745",
+
+
+                    }
+TIIE_FIXING={ "TIIE_OVERNIGHT":"SF331451",
+                    "TIIE_28":"SF43783",
+                    "TIIE_91":"SF43783",
+                    "TIIE_182":"SF111916"}
 # -----------------------------
 # HTTP helpers
 # -----------------------------
@@ -137,6 +148,167 @@ def _to_long(raw_series: List[dict], metric_by_sid: Dict[str, str]) -> pd.DataFr
     df = df[["date", "series_id", "metric", "value"]]
     df = df.dropna(subset=["date"]).sort_values(["metric", "date"], kind="stable").reset_index(drop=True)
     return df
+
+
+def _to_long_with_aliases(raw_series: List[dict], aliases_by_sid: Dict[str, List[str]]) -> pd.DataFrame:
+    """
+    Normalize Banxico response to long rows and expand series_id → aliases.
+    Output columns: date (UTC), alias, value
+    """
+    items = [s for s in raw_series if s and s.get("datos")]
+    if not items:
+        return pd.DataFrame(columns=["date", "alias", "value"])
+
+    df = pd.json_normalize(items, record_path="datos", meta=["idSerie"])
+    df = df.rename(columns={"fecha": "date", "dato": "value", "idSerie": "series_id"})
+
+    # Map series to aliases; explode to one row per alias
+    df["aliases"] = df["series_id"].map(lambda sid: aliases_by_sid.get(sid, []))
+    df = df[df["aliases"].map(bool)].explode("aliases").rename(columns={"aliases": "alias"})
+
+    # --- CRITICAL: DD/MM/YYYY parse with dayfirst + UTC ---
+    df["date"] = pd.to_datetime(
+        df["date"].astype(str).str.strip(),
+        format="%d/%m/%Y",  # be explicit; faster + avoids ambiguity
+        errors="coerce",
+        utc=True,
+    )
+
+    # Numeric parse (strip thousands commas if any)
+    df["value"] = pd.to_numeric(df["value"].astype(str).str.replace(",", "", regex=False), errors="coerce")
+
+    df = df.dropna(subset=["date"]).sort_values(["alias", "date"], kind="stable").reset_index(drop=True)
+    return df[["date", "alias", "value"]]
+
+class BanxicoTIIEFixing(DataNode):
+    """
+    Daily TIIE fixing series from Banxico SIE.
+
+    Output:
+        MultiIndex: (time_index [UTC], unique_identifier)
+        Columns: 'rate' (float, decimal = Banxico value / 100)
+
+    Notes:
+        - Uses BANXICO_TOKEN from environment.
+        - Incremental: start at last stored time_index + 1 day (global), end at yesterday 00:00 UTC.
+        - Complies with DataNode index/column rules (UTC, names, no datetime columns):contentReference[oaicite:2]{index=2}.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        return {}
+
+    def get_column_metadata(self) -> List[ColumnMetaData]:
+        return [
+            ColumnMetaData(
+                column_name="rate",
+                dtype="float",
+                label="TIIE Fixing (decimal)",
+                description="Banxico TIIE fixing value normalized to decimal (percentage/100).",
+            ),
+        ]
+
+    def get_table_metadata(self) -> Optional[msc.TableMetaData]:
+        return msc.TableMetaData(
+            identifier="banxico_tiie_fixing_1d",
+            data_frequency_id=msc.DataFrequency.one_d,
+            description="Daily TIIE fixing series from Banxico SIE (overnight, 28, 91, 128).",
+        )
+
+    def get_asset_list(self) -> List[msc.Asset]:
+        """
+        Create/obtain custom assets for the 4 TIIE fixing aliases.
+        - unique_identifier: stays as the lowercase alias ('overnight_tiie', 'tiie_28', ...)
+        - snapshot.name: UPPERCASE "INTERBANK EQUILIBRIUM INTEREST RATE {TENOR}"
+        - snapshot.ticker: UPPERCASE "TIIE_{TENOR}"
+        """
+
+        # Build identifiers + UPPERCASE name/ticker snapshots
+        def _tenor_from_alias(alias: str) -> str:
+            if alias == "OVERNIGHT":
+                return "OVERNIGHT"
+            # alias like 'tiie_28' -> '28'
+            return alias.split("_", 1)[1].upper()
+
+        unique_identifiers = list(TIIE_FIXING.keys())
+        batch_size = 50
+        asset_list: List[msc.Asset] = []
+
+        for i in range(0, len(unique_identifiers), batch_size):
+            batch_identifiers = unique_identifiers[i : i + batch_size]
+            assets_payload = []
+            for identifier in batch_identifiers:
+                tenor = _tenor_from_alias(identifier)
+                ticker = f"TIIE_{tenor}".upper()          # e.g., TIIE_28, TIIE_OVERNIGHT
+                name = f"INTERBANK EQUILIBRIUM INTEREST RATE {tenor}".upper()
+                snapshot = {"name": name, "ticker": ticker}
+                payload_item = {"unique_identifier": identifier, "snapshot": snapshot}
+                assets_payload.append(payload_item)
+
+            if not assets_payload:
+                continue
+
+            self.logger.info(
+                f"Getting or registering assets in batch {i // batch_size + 1}/"
+                f"{(len(unique_identifiers) + batch_size - 1) // batch_size}..."
+            )
+            try:
+                assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
+                asset_list.extend(assets)
+            except Exception as e:
+                self.logger.error(f"Failed to process asset batch: {e}")
+                raise
+
+        return asset_list
+
+    def update(self) -> pd.DataFrame:
+        us = self.update_statistics  # type: ignore[assignment]
+
+        # --- 0) Token
+        token = os.getenv("BANXICO_TOKEN")
+        if not token:
+            raise RuntimeError("BANXICO_TOKEN environment variable is required for Banxico SIE access.")
+
+        # --- 1) Update window (global single start for all unique_identifiers)
+        yday = dt.datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0) - dt.timedelta(days=1)
+        start_dt = (
+            (us.max_time_index_value + dt.timedelta(days=1)).astimezone(UTC).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            if us.max_time_index_value is not None
+            else dt.datetime(2010, 1, 1, tzinfo=UTC)
+        )
+        if start_dt > yday:
+            return pd.DataFrame()
+
+        start_date = start_dt.date().isoformat()
+        end_date = yday.date().isoformat()
+
+        # --- 2) Build SID universe + alias expansion (handles duplicate SIDs mapping to multiple aliases)
+        aliases_by_sid: Dict[str, List[str]] = {}
+        for alias, sid in TIIE_FIXING.items():
+            aliases_by_sid.setdefault(sid, []).append(alias)
+        sids = list(aliases_by_sid.keys())
+
+        # --- 3) Pull once + normalize long
+        raw = _fetch_banxico_series_batched(sids, start_date=start_date, end_date=end_date, token=token)
+        long_df = _to_long_with_aliases(raw, aliases_by_sid)  # columns: date(UTC), alias, value
+        if long_df.empty:
+            return pd.DataFrame()
+
+        # --- 4) Build MultiIndex and scale to decimal
+        long_df = long_df.rename(columns={"date": "time_index", "alias": "unique_identifier"})
+        long_df["rate"] = long_df["value"] / 100.0
+        out = (
+            long_df[["time_index", "unique_identifier", "rate"]]
+            .set_index(["time_index", "unique_identifier"])
+            .sort_index()
+        )
+
+        # DataNode base will validate/sanitize (index names, columns) on return:contentReference[oaicite:3]{index=3}
+        return out
 
 
 class BanxicoMXNOTR(DataNode):

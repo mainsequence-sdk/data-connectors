@@ -8,6 +8,152 @@ import numpy as np
 from mainsequence.client import Asset
 from mainsequence.client.models_tdag import Artifact
 from mainsequence.tdag import DataNode
+import io
+import requests
+import pytz
+UTC = pytz.UTC
+import json
+import gzip
+import base64
+from typing import Dict, Any
+import msgpack # You might need to install: pip install msgpack
+import gzip
+import zlib
+import base64
+import zstandard as zstd
+
+
+
+
+class MexDerTIIE28Zero(DataNode):
+    """Download and return daily MEXDERSWAP_IRSTIIEPR swap rates from valmer.com.mx
+
+        Output:
+            - Index: DatetimeIndex named 'time_index' (UTC)
+            - Columns: cleaned from the CSV (lowercase, <=63 chars, no datetime columns)
+        """
+    @staticmethod
+    def compress_curve_to_string(curve_dict: Dict[Any, Any]) -> str:
+        """
+        Serializes, compresses, and encodes a curve dictionary into a single,
+        transport-safe text string.
+
+        Pipeline: Dict -> JSON -> Gzip (binary) -> Base64 (text)
+
+        Args:
+            curve_dict: The Python dictionary representing the curve.
+
+        Returns:
+            A Base64-encoded string of the Gzipped JSON.
+        """
+        # 1. Serialize the dictionary to a compact JSON string, then encode to bytes
+        json_bytes = json.dumps(curve_dict, separators=(',', ':')).encode('utf-8')
+
+        # 2. Compress the JSON bytes using the universal Gzip standard
+        compressed_bytes = gzip.compress(json_bytes)
+
+        # 3. Encode the compressed binary data into a text-safe Base64 string
+        base64_bytes = base64.b64encode(compressed_bytes)
+
+        # 4. Decode the Base64 bytes into a final ASCII string for storage/transport
+        return base64_bytes.decode('ascii')
+    @staticmethod
+    def decompress_string_to_curve(b64_string: str) -> Dict[Any, Any]:
+        """
+        Decodes, decompresses, and deserializes a string back into a curve dictionary.
+
+        Pipeline: Base64 (text) -> Gzip (binary) -> JSON -> Dict
+
+        Args:
+            b64_string: The Base64-encoded string from the database or API.
+
+        Returns:
+            The reconstructed Python dictionary.
+        """
+        # 1. Encode the ASCII string back into Base64 bytes
+        base64_bytes = b64_string.encode('ascii')
+
+        # 2. Decode the Base64 to get the compressed Gzip bytes
+        compressed_bytes = base64.b64decode(base64_bytes)
+
+        # 3. Decompress the Gzip bytes to get the original JSON bytes
+        json_bytes = gzip.decompress(compressed_bytes)
+
+        # 4. Decode the JSON bytes to a string and parse back into a dictionary
+        return json.loads(json_bytes.decode('utf-8'))
+
+    def dependencies(self) :
+        return {}
+
+    def get_asset_list(self):
+        tiie_asset=msc.Asset.get(unique_identifier="TIIE_28")
+        self.tiie_asset=tiie_asset
+        return [tiie_asset]
+
+    def update(self):
+
+        # Download CSV from source
+        url = "https://valmer.com.mx/VAL/Web_Benchmarks/MEXDERSWAP_IRSTIIEPR.csv"
+        response = requests.get(url)
+        response.raise_for_status()
+
+        # Load CSV directly from bytes, using correct encoding
+        names = ["id", "curve_name", "asof_yyMMdd", "idx", "zero_rate"]
+        # STRICT: comma-separated, headerless, exactly these six columns
+        df = pd.read_csv(io.BytesIO(response.content), header=None, names=names, sep=",", engine="c",
+                         encoding="latin1",
+                         dtype=str)
+        # pick a rate column
+
+        df["asof_yyMMdd"] = pd.to_datetime(df["asof_yyMMdd"], format="%y%m%d")
+        df["asof_yyMMdd"] = df["asof_yyMMdd"].dt.tz_localize('UTC')
+
+        base_dt = df["asof_yyMMdd"].iloc[0] - timedelta(days=1)
+
+        if self.update_statistics.asset_time_statistics[self.tiie_asset.unique_identifier]>=base_dt:
+            return pd.DataFrame()
+
+        df["idx"] = df["idx"].astype(int)
+        df["days_to_maturity"] = (df["asof_yyMMdd"] - base_dt).dt.days
+        df["zero_rate"] = df["zero_rate"].astype(float) / 100
+
+        df["time_index"]=base_dt
+        df["unique_identifier"]=self.tiie_asset.unique_identifier
+
+        grouped = (
+            df.groupby(["time_index", "unique_identifier"])
+            .apply(lambda g: g.set_index("days_to_maturity")["zero_rate"].to_dict())
+            .rename("curve")
+            .reset_index()
+        )
+
+        #    Apply the new compression and encoding function to the 'curve' column.
+        grouped["curve"] = grouped["curve"].apply(self.compress_curve_to_string)
+
+        # 3. Final index and structure (your original code)
+        grouped = grouped.set_index(["time_index", "unique_identifier"])
+
+        return grouped
+
+
+    def get_table_metadata(self) -> msc.TableMetaData:
+        return msc.TableMetaData(
+            identifier="valmer_mexder_tiie28_zero_curve",
+            data_frequency_id=msc.DataFrequency.one_d,
+            description="Benchmark swap rates (MEXDERSWAP_IRSTIIEPR) from Valmer (valmer.com.mx)"
+        )
+
+    def get_column_metadata(self) -> list[msc.ColumnMetaData]:
+        return [
+            msc.ColumnMetaData(
+                column_name=col,
+                dtype="float",
+                label=col.replace("_", " ").title(),
+                description=f"{col} from Valmer swap rate CSV"
+            )
+            for col in self.update().columns  # will not be called during DAG execution
+        ]
+
 
 
 class ImportValmer(DataNode):
@@ -55,10 +201,14 @@ class ImportValmer(DataNode):
         Optionally filters for new artifacts based on the 'process_all_files' flag.
         """
         import os
+        from pathlib import Path
         debug_artifact_path=os.environ.get("DEBUG_ARTIFACT_PATH",None)
         if debug_artifact_path:
-            df = pd.read_excel(debug_artifact_path, engine="xlrd")
-            sorted_artifacts=[df]
+            base = Path(debug_artifact_path)
+            sorted_artifacts = [pd.read_excel(p, engine=("xlrd" if p.suffix.lower() == ".xls" else "openpyxl"))
+                                for p in sorted(base.rglob("*.xls*"))]
+
+            latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
         else:
 
             if self.artifact_data is not None:
@@ -83,7 +233,7 @@ class ImportValmer(DataNode):
                 self.logger.info(f"Filtering artifacts newer than {latest_date}.")
                 sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date > latest_date]
 
-            sorted_artifacts = sorted_artifacts[:1]
+            sorted_artifacts = sorted_artifacts[:5]
 
             self.logger.info(f"Processing {len(sorted_artifacts)} artifacts...")
             if not sorted_artifacts:
@@ -112,6 +262,8 @@ class ImportValmer(DataNode):
 
                 if df is None or df.empty:
                     continue
+            else:
+                df=artifact
 
             # Normalize all column names
             df.columns = [self._normalize_column_name(col) for col in df.columns]
@@ -161,6 +313,10 @@ class ImportValmer(DataNode):
 
         asset_list = []
         batch_size = 500
+
+        #get all assets fast
+        # all_assets=Asset.filter(unique_identifier__in=unique_identifiers)
+
         for i in range(0, len(unique_identifiers), batch_size):
             batch_identifiers = unique_identifiers[i:i + batch_size]
             assets_payload = []

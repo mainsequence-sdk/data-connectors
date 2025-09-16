@@ -37,8 +37,10 @@ def test_valmer():
             force_update=True,
         )
 
-        a=5
-
+def test_valmer_curve():
+    from data_connectors.prices.valmer.time_series import MexDerTIIE28Zero
+    node=MexDerTIIE28Zero()
+    node.run(debug_mode=True,force_update=True)
 
 def test_binance_bars_from_trades(bar_type="time"):
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades,TimeBarConfig,ImbalanceBarConfig
@@ -165,7 +167,12 @@ def test_banxico_mbonos():
     ts=BanxicoMXNOTR()
     ts.run(debug_mode=True, force_update=True)
 
+def test_banxico_tiie():
+    from data_connectors.prices.banxico.data_nodes import BanxicoTIIEFixing
+    import os
 
+    ts=BanxicoTIIEFixing()
+    ts.run(debug_mode=True, force_update=True)
 
 # test_api_time_series()
 # test_binance_bars_from_trades()
@@ -173,10 +180,16 @@ def test_banxico_mbonos():
 # test_equity_market_cap()
 # test_binance_daily_bars()
 # test_alpaca_bars()
-test_valmer()
+# test_valmer()
+
 # test_alpaca_bars_small()
 # test_banxico_mbonos()
+
 # test_databento_bars_small()
 # test_databento_market_cap_small()
 # test_databento_bars()
 # test_equity_fundamentals()
+
+
+# test_banxico_tiie()
+test_valmer_curve()
