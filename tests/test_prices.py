@@ -200,7 +200,7 @@ def test_banxico_tiie():
 # test_valmer()
 
 # test_alpaca_bars_small()
-# test_banxico_mbonos()
+test_banxico_mbonos()
 
 # test_databento_bars_small()
 # test_databento_market_cap_small()
@@ -208,5 +208,5 @@ def test_banxico_tiie():
 # test_equity_fundamentals()
 
 
-test_banxico_tiie()
-test_discount_curves()
+# test_banxico_tiie()
+# test_discount_curves()

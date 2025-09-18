@@ -14,6 +14,7 @@ import mainsequence.client as msc
 from mainsequence.tdag import DataNode
 from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
 from .settings import *
+from .utils import *
 import numpy as np
 import os
 import time
@@ -146,8 +147,8 @@ class BanxicoMXNOTR(DataNode):
             return pd.DataFrame()
 
         # --- 3) Pull once from Banxico + normalize (metric column already in EN via metric_by_sid)
-        raw = _fetch_banxico_series_batched(all_sids, start_date=start_date, end_date=end_date, token=token)
-        long_df = _to_long(raw, metric_by_sid)  # produces columns: date, series_id, metric(EN), value
+        raw = fetch_banxico_series_batched(all_sids, start_date=start_date, end_date=end_date, token=token)
+        long_df = to_long(raw, metric_by_sid)  # produces columns: date, series_id, metric(EN), value
         if long_df.empty:
             return pd.DataFrame()
 
