@@ -37,9 +37,12 @@ def test_valmer():
             force_update=True,
         )
 
-def test_valmer_curve():
-    from data_connectors.prices.valmer.time_series import MexDerTIIE28Zero
-    node=MexDerTIIE28Zero()
+def test_discount_curves():
+    from data_connectors.interest_rates.nodes import DiscountCurves,CurveConfig,TIIE_28_ZERO_CURVE
+    config=CurveConfig(unique_identifier=TIIE_28_ZERO_CURVE,
+                       name="Discount Curve TIIE 28 Mexder Valmer",
+                       )
+    node=DiscountCurves(curve_config=config)
     node.run(debug_mode=True,force_update=True)
 
 def test_binance_bars_from_trades(bar_type="time"):
@@ -168,10 +171,24 @@ def test_banxico_mbonos():
     ts.run(debug_mode=True, force_update=True)
 
 def test_banxico_tiie():
-    from data_connectors.prices.banxico.data_nodes import BanxicoTIIEFixing
-    import os
+    from data_connectors.interest_rates.nodes import FixingRatesNode,FixingRateConfig,RateConfig
+    from data_connectors.prices.banxico.settings import (TIIE_OVERNIGHT_UID,
+                                                         TIIE_28_UID,
+                                                         TIIE_91_UID,
+                                                         TIIE_182_UID, )
 
-    ts=BanxicoTIIEFixing()
+    fixing_config = FixingRateConfig(rates_config_list=[
+        RateConfig(unique_identifier=TIIE_OVERNIGHT_UID,
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_OVERNIGHT_UID}"),
+        RateConfig(unique_identifier=TIIE_28_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_28_UID}"),
+        RateConfig(unique_identifier=TIIE_91_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_91_UID}"),
+        RateConfig(unique_identifier=TIIE_182_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_182_UID}"),
+
+    ]
+
+    )
+
+    ts=FixingRatesNode(rates_config=fixing_config)
     ts.run(debug_mode=True, force_update=True)
 
 # test_api_time_series()
@@ -191,5 +208,5 @@ def test_banxico_tiie():
 # test_equity_fundamentals()
 
 
-# test_banxico_tiie()
-test_valmer_curve()
+test_banxico_tiie()
+test_discount_curves()
