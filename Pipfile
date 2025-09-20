@@ -9,6 +9,7 @@ pandas-market-calendars = "*"
 fire = "*"
 databento = "*"
 xlrd = "*"
+quantlib = "*"
 
 [requires]
 python_version = "3.9"

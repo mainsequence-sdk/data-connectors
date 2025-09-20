@@ -2,6 +2,7 @@
 from dotenv import load_dotenv
 from pathlib import Path
 
+
 # Load environment variables from .env.example
 project_root = Path(__file__).resolve().parents[1]
 env_file_path = project_root / ".env"
@@ -37,13 +38,27 @@ def test_valmer():
             force_update=True,
         )
 
+
+
+
 def test_discount_curves():
-    from data_connectors.interest_rates.nodes import DiscountCurves,CurveConfig,TIIE_28_ZERO_CURVE
-    config=CurveConfig(unique_identifier=TIIE_28_ZERO_CURVE,
-                       name="Discount Curve TIIE 28 Mexder Valmer",
-                       )
-    node=DiscountCurves(curve_config=config)
-    node.run(debug_mode=True,force_update=True)
+    from data_connectors.interest_rates.nodes import (DiscountCurves,CurveConfig,
+                                                      TIIE_28_ZERO_CURVE,)
+    from data_connectors.prices.banxico import (ON_THE_RUN_DATA_NODE_UID,
+                                                      M_BONOS_ZERO_OTR_CURVE_UID)
+    # config=CurveConfig(unique_identifier=TIIE_28_ZERO_CURVE,
+    #                    name="Discount Curve TIIE 28 Mexder Valmer",
+    #                    )
+    # node=DiscountCurves(curve_config=config)
+    # node.run(debug_mode=True,force_update=True)
+
+    config = CurveConfig(unique_identifier=M_BONOS_ZERO_OTR_CURVE_UID,
+                         name="Discount Curve M Bonos Banxico Boostrapped",
+    curve_points_dependecy_data_node_uid=ON_THE_RUN_DATA_NODE_UID
+                         )
+    node = DiscountCurves(curve_config=config)
+    node.run(debug_mode=True, force_update=True)
+
 
 def test_binance_bars_from_trades(bar_type="time"):
     from data_connectors.prices.binance.time_series import BinanceBarsFromTrades,TimeBarConfig,ImbalanceBarConfig
@@ -178,11 +193,12 @@ def test_banxico_tiie():
                                                          TIIE_182_UID, )
 
     fixing_config = FixingRateConfig(rates_config_list=[
-        RateConfig(unique_identifier=TIIE_OVERNIGHT_UID,
-                   name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_OVERNIGHT_UID}"),
-        RateConfig(unique_identifier=TIIE_28_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_28_UID}"),
-        RateConfig(unique_identifier=TIIE_91_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_91_UID}"),
-        RateConfig(unique_identifier=TIIE_182_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_182_UID}"),
+        # RateConfig(unique_identifier=TIIE_OVERNIGHT_UID,
+        #            name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_OVERNIGHT_UID}"),
+        # RateConfig(unique_identifier=TIIE_28_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_28_UID}"),
+        # RateConfig(unique_identifier=TIIE_91_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_91_UID}"),
+        # RateConfig(unique_identifier=TIIE_182_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_182_UID}"),
+        RateConfig(unique_identifier=CETE_28, name=f"CETE 28 days {CETE_28}"),
 
     ]
 
@@ -197,10 +213,10 @@ def test_banxico_tiie():
 # test_equity_market_cap()
 # test_binance_daily_bars()
 # test_alpaca_bars()
-# test_valmer()
+test_valmer()
 
 # test_alpaca_bars_small()
-test_banxico_mbonos()
+# test_banxico_mbonos()
 
 # test_databento_bars_small()
 # test_databento_market_cap_small()
@@ -209,4 +225,5 @@ test_banxico_mbonos()
 
 
 # test_banxico_tiie()
+# test_banxico_mbonos()
 # test_discount_curves()
