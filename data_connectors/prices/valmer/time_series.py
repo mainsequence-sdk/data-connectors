@@ -338,8 +338,12 @@ class ImportValmer(DataNode):
                 continue
 
             target_asset = existing_assets[u]
-            target_row = all_floating[all_floating.unique_identifier == u] #Note only adding instrument details for floaters
-            if  target_asset.instrument_pricing_detail is None and target_row.empty ==False :
+            target_row = all_floating[all_floating.unique_identifier == u]
+            if  target_row.empty ==False:
+                # Note only adding instrument details for floaters
+                continue
+
+            if  target_asset.instrument_pricing_detail is None :
                 uids_to_update.append(u)
                 continue
 
