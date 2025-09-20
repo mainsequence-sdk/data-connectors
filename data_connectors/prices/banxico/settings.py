@@ -1,5 +1,5 @@
 from typing import Dict, Tuple, Optional, Union, List
-
+import  mainsequence.instruments.settings as instrument_settings
 # -----------------------------
 # Banxico series catalogs
 # -----------------------------
@@ -27,18 +27,26 @@ BONOS_SERIES: Dict[str, Dict[str, str]] = {
 
 FUNDING_RATES={"1d":"SF331451"}
 
+FONDEO_GUVBERNAMENTAL={"":"SF43774"}
 
 
-MONEY_MARKET_RATES={"target_rate":"SF61745",
 
+BANXICO_TARGET_RATE="BANXICO_TARGET_RATE"
+MONEY_MARKET_RATES={BANXICO_TARGET_RATE:"SF61745",
 
                     }
 
-TIIE_OVERNIGHT_UID="TIIE_OVERNIGHT"
-TIIE_28_UID="TIIE_28"
-TIIE_91_UID="TIIE_91"
-TIIE_182_UID="TIIE_182"
-TIIE_FIXING_ID_MAP={ TIIE_OVERNIGHT_UID:"SF331451",
-                    TIIE_28_UID:"SF43783",
-                    TIIE_91_UID:"SF43783",
-                    TIIE_182_UID:"SF111916"}
+
+TIIE_FIXING_ID_MAP={ instrument_settings.TIIE_OVERNIGHT_UID:"SF331451",
+                    instrument_settings.TIIE_28_UID:"SF43783",
+                    instrument_settings.TIIE_91_UID:"SF43783",
+                    instrument_settings.TIIE_182_UID:"SF111916"}
+
+CETE_FIXING_ID_MAP={instrument_settings.CETE_28_UID:"SF45470",
+                    instrument_settings.CETE_91_UID:"SF45471",
+                    instrument_settings.CETE_182_UID:"SF45472"
+
+                    }
+
+
+

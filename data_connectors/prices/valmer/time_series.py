@@ -21,8 +21,8 @@ import gzip
 import zlib
 import base64
 import zstandard as zstd
-
-
+from .instrument_build import build_qll_floater_from_row
+import QuantLib as ql
 
 
 class MexDerTIIE28Zero(DataNode):
@@ -226,7 +226,7 @@ class ImportValmer(DataNode):
                 if match:
                     artifact_dates.append(pd.to_datetime(match.group(1), utc=True))
                 else:
-                    raise ValueError(f"No date found for prices xls with name {artifact.name}")
+                    continue
 
             latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
             if latest_date:
@@ -307,17 +307,57 @@ class ImportValmer(DataNode):
         if self.source_data.empty: return []
 
         self.source_data = self.source_data[self.source_data['unique_identifier'].notna()].copy()
+        self.source_data['fecha'] = pd.to_datetime(self.source_data['fecha'], format='%Y%m%d', utc=True)
+
+        idx =  self.source_data.groupby('unique_identifier')['fecha'].idxmax()
+        df_latest =  self.source_data.loc[idx].reset_index(drop=True)
+
+
+
+
+        floating_tiie =df_latest [df_latest["subyacente"].astype(str).str.contains("TIIE", na=False)]
+        floating_cetes =df_latest [df_latest ["subyacente"].astype(str).str.contains("CETE", na=False)]
+        all_floating = pd.concat([floating_tiie, floating_cetes], axis=0, ignore_index=True)
 
         unique_identifiers = self.source_data['unique_identifier'].unique().tolist()
         self.logger.info(f"Found {len(unique_identifiers)} unique assets to process.")
 
-        asset_list = []
+        registered_assets = []
         batch_size = 500
 
-        #get all assets fast
-        # all_assets=Asset.filter(unique_identifier__in=unique_identifiers)
 
-        for i in range(0, len(unique_identifiers), batch_size):
+        #get all assets fast
+        existing_assets=Asset.query(unique_identifier__in=unique_identifiers,per_page=1000)
+        existing_assets={a.unique_identifier:a for a in existing_assets}
+        uids_to_update=[]
+        for u in unique_identifiers:
+
+
+            if u not in existing_assets.keys():
+                uids_to_update.append(u)
+                continue
+
+            target_asset = existing_assets[u]
+            target_row = all_floating[all_floating.unique_identifier == u] #Note only adding instrument details for floaters
+            if  target_asset.instrument_pricing_detail is None and target_row.empty ==False :
+                uids_to_update.append(u)
+                continue
+
+            old_face_value=target_asset.instrument_pricing_detail.get("face_value")
+            if old_face_value is None:
+                # no pricing instruments
+                uids_to_update.append(u)
+                continue
+            #update in face value
+            if old_face_value!=target_row["valornominalactualizado"]:
+                uids_to_update.append(u)
+                continue
+
+
+
+        instrument_pricing_detail_map={}
+
+        for i in range(0, len(uids_to_update), batch_size):
             batch_identifiers = unique_identifiers[i:i + batch_size]
             assets_payload = []
 
@@ -331,18 +371,34 @@ class ImportValmer(DataNode):
                     "snapshot": snapshot,
                 }
                 assets_payload.append(payload_item)
+                row=df_latest[df_latest['unique_identifier']==identifier].iloc[0]
+                if "TIIE" in str(row["subyacente"]) or "CETE" in str(row["subyacente"]):
+                    if str(row["reglacupon"]) =="0":
+                        continue #Todo not implemented zero
 
+                    ql_bond=build_qll_floater_from_row(row=row,
+                                                       calendar=ql.Mexico(), dc=ql.Actual360(),
+                                                       bdc=ql.ModifiedFollowing, settlement_days=0,
+                                                       )
+                    instrument_pricing_detail_map[identifier]=ql_bond
+                else:
+                    continue
             if not assets_payload:
                 continue
 
             self.logger.info(f"Getting or registering assets in batch {i // batch_size + 1}/{len(unique_identifiers)//batch_size}...")
             try:
                 assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
-                asset_list.extend(assets)
+                registered_assets.extend(assets)
             except Exception as e:
                 self.logger.error(f"Failed to process asset batch: {e}")
                 raise
 
+        for asset in registered_assets:
+            if asset.unique_identifier in instrument_pricing_detail_map.keys():
+                asset.set_instrument_pricing_details_from_ms_instrument(instrument=instrument_pricing_detail_map[asset.unique_identifier])
+
+        asset_list=registered_assets+list(existing_assets.values())
         return asset_list
 
     def _get_column_metadata(self):
@@ -367,7 +423,7 @@ class ImportValmer(DataNode):
             raise KeyError("Normalized columns 'fecha' and/or 'preciosucio' not found in the data.")
 
         source_data.rename(columns={"fecha": "time_index"}, inplace=True)
-        source_data['time_index'] = pd.to_datetime(source_data['time_index'], format='%Y%m%d', utc=True)
+
 
         # Select only the necessary columns for the final OHLCV output
         price_series = source_data['preciosucio'].astype(float)
@@ -418,6 +474,9 @@ class ImportValmer(DataNode):
             data_frequency_id=msc.DataFrequency.one_month,
         )
         return meta
+
+
+
 
 
 

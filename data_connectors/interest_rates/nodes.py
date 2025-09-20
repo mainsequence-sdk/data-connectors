@@ -2,24 +2,27 @@ import re
 
 import mainsequence.client as msc
 
-from mainsequence.tdag import DataNode
+from mainsequence.tdag import DataNode, APIDataNode
 
 import pytz
 
 import json
 
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Optional
 import gzip
 import base64
 from pydantic import BaseModel,Field
 from data_connectors.prices.valmer.utils import build_tiie_valmer
-from data_connectors.prices.banxico import TIIE_FIXING_BUILD_MAP
+from data_connectors.prices.banxico import( TIIE_FIXING_BUILD_MAP, ON_THE_RUN_DATA_NODE_UID, boostrap_mbono_curve,
+                                            CETE_FIXING_BUILD_MAP)
+
 import datetime
 import pandas as pd
 
 
 
 TIIE_28_ZERO_CURVE="F_TIIE_28_VALMER"
+M_BONOS_ZERO_OTR="M_BONOS_ZERO_OTR"
 UTC = pytz.UTC
 
 class CurveConfig(BaseModel):
@@ -27,6 +30,9 @@ class CurveConfig(BaseModel):
                                           ignore_from_storage_hash=True
                                           )
     name:str=Field(...,title="Curve name",description="string name of curve to create",
+                                          ignore_from_storage_hash=True
+                                          )
+    curve_points_dependecy_data_node_uid:Optional[str]=Field(None,title="Dependecies curve points",description="",
                                           ignore_from_storage_hash=True
                                           )
 
@@ -98,9 +104,12 @@ def decompress_string_to_curve(b64_string: str) -> Dict[Any, Any]:
 
 
 
-DISCOUNT_CURVE_BUILD_REGISTRY={TIIE_28_ZERO_CURVE:build_tiie_valmer,}
+DISCOUNT_CURVE_BUILD_REGISTRY={TIIE_28_ZERO_CURVE:build_tiie_valmer,
+                               M_BONOS_ZERO_OTR:boostrap_mbono_curve,
+                               }
 FIXING_RATE_BUILD_REGISTRY={}
 FIXING_RATE_BUILD_REGISTRY.update(TIIE_FIXING_BUILD_MAP)
+FIXING_RATE_BUILD_REGISTRY.update(CETE_FIXING_BUILD_MAP)
 
 
 
@@ -119,10 +128,17 @@ class DiscountCurves(DataNode):
 
         self.curve_config=curve_config
 
+        base_node_curve_points = self.curve_config.curve_points_dependecy_data_node_uid
+        if base_node_curve_points is not None:
+            base_node_curve_points = APIDataNode.build_from_identifier(identifier=base_node_curve_points)
+        self.base_node_curve_points = base_node_curve_points
         super().__init__(*args, **kwargs)
 
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
 
-    def dependencies(self) :
+        if self.base_node_curve_points is not None:
+            return {self.curve_config.curve_points_dependecy_data_node_uid: self.base_node_curve_points}
+
         return {}
 
     def get_asset_list(self):
@@ -147,10 +163,18 @@ class DiscountCurves(DataNode):
         # Download CSV from source
         df=DISCOUNT_CURVE_BUILD_REGISTRY[self.curve_config.unique_identifier](update_statistics=self.update_statistics,
                                            curve_unique_identifier=self.curve_config.unique_identifier,
+                                                                              base_node_curve_points=self.base_node_curve_points,
                                            )
 
         #    Apply the new compression and encoding function to the 'curve' column.
         df["curve"] = df["curve"].apply(compress_curve_to_string)
+
+        last_update=self.update_statistics.get_last_update_index_2d(self.curve_config.unique_identifier)
+
+        df=df[df.index.get_level_values("time_index")>last_update]
+
+        if df.empty:
+            return pd.DataFrame()
 
         return df
 
@@ -180,9 +204,10 @@ class FixingRatesNode(DataNode):
     def __init__(self, rates_config: FixingRateConfig, *args, **kwargs):
         self.rates_config = rates_config
 
+
+
         super().__init__(*args, **kwargs)
-    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
-        return {}
+
     def get_asset_list(self):
 
         for config in self.rates_config.rates_config_list:
@@ -201,6 +226,9 @@ class FixingRatesNode(DataNode):
 
         return assets
 
+    def dependencies(self):
+        return {}
+
     def update(self):
 
         all_dfs=[]
@@ -208,6 +236,7 @@ class FixingRatesNode(DataNode):
             # Download CSV from source
             df=FIXING_RATE_BUILD_REGISTRY[asset.unique_identifier](update_statistics=self.update_statistics,
                                                unique_identifier=asset.unique_identifier,
+
                                                )
             if df.empty:
                 continue

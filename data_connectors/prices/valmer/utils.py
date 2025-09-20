@@ -4,7 +4,7 @@ from datetime import datetime,timedelta
 import io
 
 
-def build_tiie_valmer(update_statistics,curve_unique_identifier:str,):
+def build_tiie_valmer(update_statistics,curve_unique_identifier:str,base_node_curve_points=None):
     url = "https://valmer.com.mx/VAL/Web_Benchmarks/MEXDERSWAP_IRSTIIEPR.csv"
     response = requests.get(url)
     response.raise_for_status()

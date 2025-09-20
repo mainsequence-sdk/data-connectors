@@ -62,14 +62,38 @@ class BanxicoMXNOTR(DataNode):
         # Discover both families via ticker pattern:contentReference[oaicite:3]{index=3}
         cetes_tickers = [f"MCET_{t}_OTR" for t in self.CETES_TENORS]
         bonos_tickers = [f"MBONO_{t}_OTR" for t in self.BONOS_TENORS]
-        wanted = cetes_tickers + bonos_tickers
-        assets = msc.Asset.filter(ticker__in=wanted,
-                                        security_market_sector=msc.MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_GOVT,
-                                        security_type=msc.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_DOMESTIC,
-                                        security_type_2=msc.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_2_GOVT,
-                                        exchange_code="MEXICO",
-                                        )
-        return list(assets) if assets else []
+
+
+        wanted = cetes_tickers + bonos_tickers +[BANXICO_TARGET_RATE]
+
+        assets_payload=[]
+        for identifier in wanted:
+            snapshot = {
+                "name": identifier,
+                "ticker": identifier,
+                "exchange_code": "MEXICO",
+            }
+            payload_item = {
+                "unique_identifier": identifier,
+                "snapshot": snapshot,
+                "security_market_sector" : msc.MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_GOVT,
+            "security_type" : msc.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_DOMESTIC,
+            "security_type_2" : msc.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_2_GOVT,
+            }
+            assets_payload.append(payload_item)
+
+
+        try:
+            assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
+
+        except Exception as e:
+            self.logger.error(f"Failed to process asset batch: {e}")
+            raise
+
+
+
+
+        return assets
 
     def get_column_metadata(self) -> List[ColumnMetaData]:
         return [
@@ -93,7 +117,7 @@ class BanxicoMXNOTR(DataNode):
     def get_table_metadata(self) -> Optional[msc.TableMetaData]:
         # Identifier + daily frequency + a concise description
         return msc.TableMetaData(
-            identifier="banxico_1d_otr_mxn",
+            identifier=ON_THE_RUN_DATA_NODE_UID,
             data_frequency_id=msc.DataFrequency.one_d,
             description=(
                 "On-the-run CETES & BONOS (MXN) daily time series from Banxico SIE with columns: "
@@ -222,6 +246,23 @@ class BanxicoMXNOTR(DataNode):
         if not out_parts:
             return pd.DataFrame()
 
+
+        #get Funding rate
+
+
+        raw = fetch_banxico_series_batched([MONEY_MARKET_RATES[BANXICO_TARGET_RATE]], start_date=start_date, end_date=end_date, token=token)
+        long_df = to_long(raw, {BANXICO_TARGET_RATE:"dato"})  # produces columns: date, series_id, metric(EN), value
+        long_df["days_to_maturity"]=1
+        long_df["type"]="overnight_rate"
+        long_df["date"]=pd.to_datetime(long_df["date"],utc=True)
+        long_df=long_df.rename(columns={"date":"time_index","value":"dirty_price"})
+        inverse={v:k for k,v in MONEY_MARKET_RATES.items()}
+        long_df["unique_identifier"]=long_df["series_id"].map(inverse)
+        long_df=long_df.set_index(["time_index","unique_identifier"])
+        long_df["clean_price"]=None
+        long_df["dirty_price"] = long_df["dirty_price"]/100
+        long_df["current_coupon"] = None
+        out_parts.append(long_df[out_parts[0].columns])
         out = pd.concat(out_parts).sort_index()
         out = out.replace(np.nan, None)
         return out
