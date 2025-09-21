@@ -5,7 +5,6 @@ import pandas as pd
 from tqdm import tqdm
 import mainsequence.client as msc
 import numpy as np
-from mainsequence.client import Asset
 from mainsequence.client.models_tdag import Artifact
 from mainsequence.tdag import DataNode
 import io
@@ -13,17 +12,13 @@ import requests
 import pytz
 UTC = pytz.UTC
 import json
-import gzip
-import base64
 from typing import Dict, Any
-import msgpack # You might need to install: pip install msgpack
 import gzip
-import zlib
+
 import base64
-import zstandard as zstd
 from .instrument_build import build_qll_floater_from_row
 import QuantLib as ql
-
+import os
 
 class MexDerTIIE28Zero(DataNode):
     """Download and return daily MEXDERSWAP_IRSTIIEPR swap rates from valmer.com.mx
@@ -327,9 +322,11 @@ class ImportValmer(DataNode):
 
 
         #get all assets fast
-        existing_assets=Asset.query(unique_identifier__in=unique_identifiers,per_page=1000)
+        per_page_assets=os.environ.get("VALMER_PER_PAGE",500)
+        existing_assets=msc.Asset.query(unique_identifier__in=unique_identifiers,per_page=5000)
         existing_assets={a.unique_identifier:a for a in existing_assets}
         uids_to_update=[]
+        uids_to_update_pricing_details=[]
         for u in unique_identifiers:
 
 
@@ -339,21 +336,25 @@ class ImportValmer(DataNode):
 
             target_asset = existing_assets[u]
             target_row = all_floating[all_floating.unique_identifier == u]
-            if  target_row.empty ==False:
+            if  target_row.empty ==True:
                 # Note only adding instrument details for floaters
                 continue
-
+            target_row=target_row.iloc[0]
             if  target_asset.instrument_pricing_detail is None :
                 uids_to_update.append(u)
                 continue
+            if "instrument" not in target_asset.instrument_pricing_detail:
+                #wrongly assigned
+                uids_to_update.append(u)
+                continue
 
-            old_face_value=target_asset.instrument_pricing_detail.get("face_value")
+            old_face_value=target_asset.instrument_pricing_detail['instrument'].get("face_value")
             if old_face_value is None:
                 # no pricing instruments
                 uids_to_update.append(u)
                 continue
             #update in face value
-            if old_face_value!=target_row["valornominalactualizado"]:
+            if old_face_value!=target_row["valornominalactualizado"] or True ==True : #todo Remove just for testing
                 uids_to_update.append(u)
                 continue
 
@@ -362,7 +363,7 @@ class ImportValmer(DataNode):
         instrument_pricing_detail_map={}
 
         for i in range(0, len(uids_to_update), batch_size):
-            batch_identifiers = unique_identifiers[i:i + batch_size]
+            batch_identifiers = uids_to_update[i:i + batch_size]
             assets_payload = []
 
             for identifier in batch_identifiers:
@@ -384,7 +385,11 @@ class ImportValmer(DataNode):
                                                        calendar=ql.Mexico(), dc=ql.Actual360(),
                                                        bdc=ql.ModifiedFollowing, settlement_days=0,
                                                        )
-                    instrument_pricing_detail_map[identifier]=ql_bond
+                    instrument_pricing_detail_map[identifier]={"instrument":ql_bond,"market_pricing_details":{"yield":row["tasaderendimiento"],
+
+                                                                                                              },
+                                                               "pricing_details_date":row["fecha"]
+                                                               }
                 else:
                     continue
             if not assets_payload:
@@ -400,7 +405,8 @@ class ImportValmer(DataNode):
 
         for asset in registered_assets:
             if asset.unique_identifier in instrument_pricing_detail_map.keys():
-                asset.set_instrument_pricing_details_from_ms_instrument(instrument=instrument_pricing_detail_map[asset.unique_identifier])
+                asset.set_instrument_pricing_details_from_ms_instrument(**instrument_pricing_detail_map[asset.unique_identifier]
+                                                                        )
 
         asset_list=registered_assets+list(existing_assets.values())
         return asset_list

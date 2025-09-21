@@ -38,6 +38,94 @@ def test_valmer():
             force_update=True,
         )
 
+def test_floating_portfolio_valmer():
+    import mainsequence.client as msc
+    import re
+    import pandas as pd
+    from mainsequence.virtualfundbuilder.data_nodes import PortfolioFromDF, All_PORTFOLIO_COLUMNS, WEIGHTS_TO_PORTFOLIO_COLUMNS
+    from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
+
+    import json
+
+
+    class TestPortfolio(PortfolioFromDF):
+        def get_portfolio_df(self):
+            BUCKET_NAME = "Vector de precios"
+            artifacts = msc.Artifact.filter(bucket__name=BUCKET_NAME)
+            sorted_artifacts = sorted(artifacts, key=lambda artifact: artifact.name)
+            # --- Conditional processing based on process_all_files flag ---
+            df = pd.DataFrame()
+            for artifact in sorted_artifacts:
+                match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
+                if match:
+                    df = pd.read_excel(artifact.content, engine="xlrd")
+                    continue
+            if df.empty:
+                return pd.DataFrame()
+
+            df = df[df["SUBYACENTE"].astype(str).str.contains("TIIE", na=False)]
+
+            df = df.iloc[:10]
+            df["FECHA"]=pd.to_datetime(df["FECHA"], format='%Y%m%d', utc=True)
+            df["unique_identifier"] = (
+                df["TIPO VALOR"].astype("string")
+                .str.cat(df["EMISORA"].astype("string"), sep="_")
+                .str.cat(df["SERIE"].astype("string"), sep="_")
+            )
+
+            unique_identifiers = df['unique_identifier'].unique().tolist()
+            existing_assets = msc.Asset.query(unique_identifier__in=unique_identifiers, per_page=1000)
+            existing_assets = [a for a in existing_assets if a.instrument_pricing_detail is not None]
+            if len(existing_assets) == 0:
+                return pd.DataFrame()
+
+            # ----- build dict-valued columns -----
+            keys = [a.unique_identifier for a in existing_assets]
+            n = len(keys)
+
+            # random weights that sum to 1
+            import numpy as np
+            w = np.random.rand(n)
+            w = w / w.sum()
+            weights_dict = json.dumps({k: float(v) for k, v in zip(keys, w)})
+
+            # everything else set to 1 per asset
+            ones_dict = json.dumps({k: 1 for k in keys})
+
+            time_idx = df["FECHA"].iloc[0]
+
+            # Map logical fields to actual DF columns
+            col_weights_current = "rebalance_weights" # "weights_current"
+            col_price_current ="rebalance_price"  # "price_current"
+            col_vol_current ="volume"  # "volume_current"
+            col_weights_before = "weights_at_last_rebalance" # "weights_before"
+            col_price_before ="price_at_last_rebalance" # "price_before"
+            col_vol_before ="volume_at_last_rebalance"  # "volume_before"
+
+            row = {
+                "time_index": time_idx,
+                "close": 1,
+                "return": 0,
+                "last_rebalance_date": time_idx.timestamp(),
+                col_weights_current: weights_dict,
+                col_weights_before: weights_dict,  # same as current
+                col_price_current: ones_dict,
+                col_price_before: ones_dict,
+                col_vol_current: ones_dict,
+                col_vol_before: ones_dict,
+            }
+
+            # one-row DataFrame
+            portoflio_df = pd.DataFrame([row])
+            portoflio_df=portoflio_df.set_index("time_index")
+            return portoflio_df
+
+    node=TestPortfolio(portfolio_name="TestPortfolio",calendar_name="24/7",target_portfolio_about="Test with Vector")
+
+    PortfolioInterface.build_and_run_portfolio_from_df(portfolio_node=node,
+                                                       add_portfolio_to_markets_backend=True)
+
+
 
 
 
@@ -227,3 +315,4 @@ test_valmer()
 # test_banxico_tiie()
 # test_banxico_mbonos()
 # test_discount_curves()
+test_floating_portfolio_valmer()

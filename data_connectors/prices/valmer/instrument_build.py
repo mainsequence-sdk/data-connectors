@@ -708,7 +708,7 @@ def run_price_check(
 
         # Build bond (explicit schedule)
         built = build_qll_floater_from_row(
-            row, curve,
+            row,
             calendar=ql.Mexico(), dc=ql.Actual360(), bdc=ql.ModifiedFollowing, settlement_days=0,
         )
 
