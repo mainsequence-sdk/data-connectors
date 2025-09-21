@@ -340,21 +340,21 @@ class ImportValmer(DataNode):
                 # Note only adding instrument details for floaters
                 continue
             target_row=target_row.iloc[0]
-            if  target_asset.instrument_pricing_detail is None :
+            if  target_asset.current_pricing_detail is None :
                 uids_to_update.append(u)
                 continue
-            if "instrument" not in target_asset.instrument_pricing_detail:
+            if target_asset.current_pricing_detail.instrument_dump is None:
                 #wrongly assigned
                 uids_to_update.append(u)
                 continue
 
-            old_face_value=target_asset.instrument_pricing_detail['instrument'].get("face_value")
+            old_face_value=target_asset.current_pricing_detail.instrument_dump["instrument"].get("face_value")
             if old_face_value is None:
                 # no pricing instruments
                 uids_to_update.append(u)
                 continue
             #update in face value
-            if old_face_value!=target_row["valornominalactualizado"] or True ==True : #todo Remove just for testing
+            if old_face_value!=target_row["valornominalactualizado"] :
                 uids_to_update.append(u)
                 continue
 
@@ -385,9 +385,7 @@ class ImportValmer(DataNode):
                                                        calendar=ql.Mexico(), dc=ql.Actual360(),
                                                        bdc=ql.ModifiedFollowing, settlement_days=0,
                                                        )
-                    instrument_pricing_detail_map[identifier]={"instrument":ql_bond,"market_pricing_details":{"yield":row["tasaderendimiento"],
-
-                                                                                                              },
+                    instrument_pricing_detail_map[identifier]={"instrument":ql_bond,
                                                                "pricing_details_date":row["fecha"]
                                                                }
                 else:
@@ -395,7 +393,7 @@ class ImportValmer(DataNode):
             if not assets_payload:
                 continue
 
-            self.logger.info(f"Getting or registering assets in batch {i // batch_size + 1}/{len(unique_identifiers)//batch_size}...")
+            self.logger.info(f"Getting or registering assets in batch {i // batch_size + 1}/{len(uids_to_update)//batch_size}...")
             try:
                 assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
                 registered_assets.extend(assets)
@@ -405,7 +403,7 @@ class ImportValmer(DataNode):
 
         for asset in registered_assets:
             if asset.unique_identifier in instrument_pricing_detail_map.keys():
-                asset.set_instrument_pricing_details_from_ms_instrument(**instrument_pricing_detail_map[asset.unique_identifier]
+                asset.add_instrument_pricing_details_from_ms_instrument(**instrument_pricing_detail_map[asset.unique_identifier]
                                                                         )
 
         asset_list=registered_assets+list(existing_assets.values())

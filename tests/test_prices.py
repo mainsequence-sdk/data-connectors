@@ -63,9 +63,11 @@ def test_floating_portfolio_valmer():
             if df.empty:
                 return pd.DataFrame()
 
-            df = df[df["SUBYACENTE"].astype(str).str.contains("TIIE", na=False)]
+            df_tiie = df[df["SUBYACENTE"].astype(str).str.contains("TIIE", na=False)].iloc[:10]
+            df_cete=df[df["SUBYACENTE"].astype(str).str.contains("CETE", na=False)].iloc[:10]
+            df=pd.concat([df_tiie, df_cete],axis=0)
 
-            df = df.iloc[:10]
+            df = df
             df["FECHA"]=pd.to_datetime(df["FECHA"], format='%Y%m%d', utc=True)
             df["unique_identifier"] = (
                 df["TIPO VALOR"].astype("string")
@@ -75,7 +77,7 @@ def test_floating_portfolio_valmer():
 
             unique_identifiers = df['unique_identifier'].unique().tolist()
             existing_assets = msc.Asset.query(unique_identifier__in=unique_identifiers, per_page=1000)
-            existing_assets = [a for a in existing_assets if a.instrument_pricing_detail is not None]
+            existing_assets = [a for a in existing_assets if a.current_pricing_detail is not None]
             if len(existing_assets) == 0:
                 return pd.DataFrame()
 
@@ -301,7 +303,7 @@ def test_banxico_tiie():
 # test_equity_market_cap()
 # test_binance_daily_bars()
 # test_alpaca_bars()
-test_valmer()
+# test_valmer()
 
 # test_alpaca_bars_small()
 # test_banxico_mbonos()
