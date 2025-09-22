@@ -52,3 +52,36 @@ jobs:
 #    resource:
 #      notebook:
 #        path: "data_connectors/scripts/create_translation_tables.py"
+
+
+  - name: "Bancixo MBonos"
+    resource:
+      notebook:
+        path: "data_connectors/notebooks/banxico_mbonos.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Bancixo TIEE Fixing"
+    resource:
+      notebook:
+        path: "data_connectors/notebooks/banxico_tiie_fixing.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Discount Curves"
+    resource:
+      notebook:
+        path: "data_connectors/notebooks/discount_curves.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+
+  - name: "Valmer Prices"
+    resource:
+      notebook:
+        path: "data_connectors/notebooks/valmer_prices.ipynb"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
