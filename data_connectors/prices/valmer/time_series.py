@@ -10,13 +10,15 @@ from mainsequence.tdag import DataNode
 import io
 import requests
 import pytz
+
+from data_connectors.prices.valmer.instrument_build import build_qll_floater_from_row
+
 UTC = pytz.UTC
 import json
 from typing import Dict, Any
 import gzip
 
 import base64
-from .instrument_build import build_qll_floater_from_row
 import QuantLib as ql
 import os
 
