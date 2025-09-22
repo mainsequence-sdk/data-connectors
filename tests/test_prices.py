@@ -1,7 +1,7 @@
 
 from dotenv import load_dotenv
 from pathlib import Path
-
+import numpy as np
 
 # Load environment variables from .env.example
 project_root = Path(__file__).resolve().parents[1]
@@ -62,8 +62,10 @@ def test_floating_portfolio_valmer():
                     continue
             if df.empty:
                 return pd.DataFrame()
+            import numpy as np
+            random_assets=np.random.randint(100,size=10)
 
-            df_tiie = df[df["SUBYACENTE"].astype(str).str.contains("TIIE", na=False)].iloc[:10]
+            df_tiie = df[df["SUBYACENTE"].astype(str).str.contains("TIIE", na=False)].iloc[random_assets]
             df_cete=df[df["SUBYACENTE"].astype(str).str.contains("CETE", na=False)].iloc[:10]
             df=pd.concat([df_tiie, df_cete],axis=0)
 
@@ -120,9 +122,17 @@ def test_floating_portfolio_valmer():
             # one-row DataFrame
             portoflio_df = pd.DataFrame([row])
             portoflio_df=portoflio_df.set_index("time_index")
+            if self.update_statistics.max_time_index_value is not None:
+                portoflio_df=portoflio_df[portoflio_df.index>self.update_statistics.max_time_index_value]
             return portoflio_df
 
     node=TestPortfolio(portfolio_name="TestPortfolio",calendar_name="24/7",target_portfolio_about="Test with Vector")
+
+    PortfolioInterface.build_and_run_portfolio_from_df(portfolio_node=node,
+                                                       add_portfolio_to_markets_backend=True)
+
+    node = TestPortfolio(portfolio_name="TestPortfolio2", calendar_name="24/7",
+                         target_portfolio_about="Test with Vector2")
 
     PortfolioInterface.build_and_run_portfolio_from_df(portfolio_node=node,
                                                        add_portfolio_to_markets_backend=True)
