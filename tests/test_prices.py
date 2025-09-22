@@ -328,6 +328,6 @@ def test_banxico_tiie_fixing():
 
 
 test_banxico_tiie_fixing()
-# test_banxico_mbonos()
+test_banxico_mbonos()
 # test_discount_curves()
 test_floating_portfolio_valmer()
