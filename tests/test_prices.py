@@ -285,20 +285,23 @@ def test_banxico_mbonos():
     ts=BanxicoMXNOTR()
     ts.run(debug_mode=True, force_update=True)
 
-def test_banxico_tiie():
+def test_banxico_tiie_fixing():
     from data_connectors.interest_rates.nodes import FixingRatesNode,FixingRateConfig,RateConfig
-    from data_connectors.prices.banxico.settings import (TIIE_OVERNIGHT_UID,
+    from mainsequence.instruments.settings  import (TIIE_OVERNIGHT_UID,
                                                          TIIE_28_UID,
                                                          TIIE_91_UID,
-                                                         TIIE_182_UID, )
+                                                         TIIE_182_UID,
+                                                    CETE_28_UID,CETE_91_UID,CETE_182_UID)
 
     fixing_config = FixingRateConfig(rates_config_list=[
-        # RateConfig(unique_identifier=TIIE_OVERNIGHT_UID,
-        #            name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_OVERNIGHT_UID}"),
-        # RateConfig(unique_identifier=TIIE_28_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_28_UID}"),
-        # RateConfig(unique_identifier=TIIE_91_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_91_UID}"),
-        # RateConfig(unique_identifier=TIIE_182_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_182_UID}"),
-        RateConfig(unique_identifier=CETE_28, name=f"CETE 28 days {CETE_28}"),
+        RateConfig(unique_identifier=TIIE_OVERNIGHT_UID,
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_OVERNIGHT_UID}"),
+        RateConfig(unique_identifier=TIIE_28_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_28_UID}"),
+        RateConfig(unique_identifier=TIIE_91_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_91_UID}"),
+        RateConfig(unique_identifier=TIIE_182_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_182_UID}"),
+        RateConfig(unique_identifier=CETE_28_UID, name=f"CETE 28 days {CETE_28_UID}"),
+        RateConfig(unique_identifier=CETE_91_UID, name=f"CETE 28 days {CETE_91_UID}"),
+        RateConfig(unique_identifier=CETE_182_UID, name=f"CETE 28 days {CETE_182_UID}"),
 
     ]
 
@@ -324,7 +327,7 @@ def test_banxico_tiie():
 # test_equity_fundamentals()
 
 
-# test_banxico_tiie()
+test_banxico_tiie_fixing()
 # test_banxico_mbonos()
 # test_discount_curves()
 test_floating_portfolio_valmer()
