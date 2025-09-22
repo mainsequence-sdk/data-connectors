@@ -144,15 +144,15 @@ def test_floating_portfolio_valmer():
 def test_discount_curves():
     from data_connectors.interest_rates.nodes import (DiscountCurves,CurveConfig,
                                                       TIIE_28_ZERO_CURVE,)
-    from data_connectors.prices.banxico import (ON_THE_RUN_DATA_NODE_UID,
-                                                      M_BONOS_ZERO_OTR_CURVE_UID)
-    # config=CurveConfig(unique_identifier=TIIE_28_ZERO_CURVE,
-    #                    name="Discount Curve TIIE 28 Mexder Valmer",
-    #                    )
-    # node=DiscountCurves(curve_config=config)
-    # node.run(debug_mode=True,force_update=True)
+    from mainsequence.instruments.settings import ( M_BONOS_ZERO_CURVE)
+    from data_connectors.prices.banxico.settings import ON_THE_RUN_DATA_NODE_UID
+    config=CurveConfig(unique_identifier=TIIE_28_ZERO_CURVE,
+                       name="Discount Curve TIIE 28 Mexder Valmer",
+                       )
+    node=DiscountCurves(curve_config=config)
+    node.run(debug_mode=True,force_update=True)
 
-    config = CurveConfig(unique_identifier=M_BONOS_ZERO_OTR_CURVE_UID,
+    config = CurveConfig(unique_identifier=M_BONOS_ZERO_CURVE,
                          name="Discount Curve M Bonos Banxico Boostrapped",
     curve_points_dependecy_data_node_uid=ON_THE_RUN_DATA_NODE_UID
                          )
