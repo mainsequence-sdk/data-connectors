@@ -3,7 +3,7 @@ jobs:
   - name: "Binance Prices Daily"
     resource:
       notebook:
-        path: "/notebooks/binance_daily.ipynb"
+        path: "data_connectors/notebooks/binance_daily.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -11,7 +11,7 @@ jobs:
   - name: "Alpaca Prices Daily Test"
     resource:
       notebook:
-        path: "/notebooks/alpaca_daily_test.ipynb"
+        path: "data_connectors/notebooks/alpaca_daily_test.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -19,7 +19,7 @@ jobs:
   - name: "Alpaca Prices Daily"
     resource:
       notebook:
-        path: "/notebooks/alpaca_daily.ipynb"
+        path: "data_connectors/notebooks/alpaca_daily.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -27,7 +27,7 @@ jobs:
   - name: "Fundamentals"
     resource:
       notebook:
-        path: "/notebooks/fundamentals.ipynb"
+        path: "data_connectors/notebooks/fundamentals.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -35,7 +35,7 @@ jobs:
   - name: "Coingecko Market Cap"
     resource:
       notebook:
-        path: "/notebooks/coingecko_market_cap.ipynb"
+        path: "data_connectors/notebooks/coingecko_market_cap.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -43,7 +43,7 @@ jobs:
   - name: "Polygon Market Cap"
     resource:
       notebook:
-        path: "/notebooks/polygon_market_cap.ipynb"
+        path: "data_connectors/notebooks/polygon_market_cap.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -51,4 +51,4 @@ jobs:
 #  - name: "Asset Translation Tables"
 #    resource:
 #      notebook:
-#        path: "/scripts/create_translation_tables.py"
+#        path: "data_connectors/scripts/create_translation_tables.py"
