@@ -13,7 +13,7 @@ import gzip
 import base64
 from pydantic import BaseModel,Field
 from data_connectors.prices.valmer.utils import build_tiie_valmer
-from data_connectors.prices.banxico import( TIIE_FIXING_BUILD_MAP, ON_THE_RUN_DATA_NODE_UID, boostrap_mbono_curve,
+from data_connectors.prices.banxico import( TIIE_FIXING_BUILD_MAP, boostrap_mbono_curve,
                                             CETE_FIXING_BUILD_MAP)
 
 import datetime
