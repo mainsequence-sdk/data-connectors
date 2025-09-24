@@ -11,7 +11,7 @@ import io
 import requests
 import pytz
 
-from data_connectors.prices.valmer.instrument_build import build_qll_floater_from_row
+from data_connectors.prices.valmer.instrument_build import build_qll_bond_from_row,normalize_column_name,get_instrument_conventions
 
 UTC = pytz.UTC
 import json
@@ -183,14 +183,6 @@ class ImportValmer(DataNode):
         )
         return explanation
 
-    @staticmethod
-    def _normalize_column_name(col_name: str) -> str:
-        """
-        Removes special characters and newlines from a string and converts it to lowercase.
-        """
-        # Replace newlines and then remove all non-alphanumeric characters
-        cleaned_name = str(col_name).replace('\n', ' ')
-        return re.sub(r'[^a-z0-9]', '', cleaned_name.lower())
 
     def _get_artifact_data(self):
         """
@@ -263,7 +255,7 @@ class ImportValmer(DataNode):
                 df=artifact
 
             # Normalize all column names
-            df.columns = [self._normalize_column_name(col) for col in df.columns]
+            df.columns = [normalize_column_name(col) for col in df.columns]
 
             # Check for required columns for instrument identifier
             required_cols = {"tipovalor", "emisora", "serie"}
@@ -314,18 +306,25 @@ class ImportValmer(DataNode):
 
         floating_tiie =df_latest [df_latest["subyacente"].astype(str).str.contains("TIIE", na=False)]
         floating_cetes =df_latest [df_latest ["subyacente"].astype(str).str.contains("CETE", na=False)]
-        all_floating = pd.concat([floating_tiie, floating_cetes], axis=0, ignore_index=True)
+        m_bono_fixed_0=df_latest [df_latest ["subyacente"].astype(str).str.contains("Bonos M", na=False)]
+        m_bono_fixed_0 = m_bono_fixed_0[m_bono_fixed_0.monedaemision == "MPS"]
+
+
+        all_target_bonds = pd.concat([floating_tiie, floating_cetes,m_bono_fixed_0], axis=0, ignore_index=True)
+
+
+
 
         unique_identifiers = self.source_data['unique_identifier'].unique().tolist()
         self.logger.info(f"Found {len(unique_identifiers)} unique assets to process.")
 
         registered_assets = []
-        batch_size = 500
+
 
 
         #get all assets fast
-        per_page_assets=os.environ.get("VALMER_PER_PAGE",500)
-        existing_assets=msc.Asset.query(unique_identifier__in=unique_identifiers,per_page=5000)
+        per_page_assets=os.environ.get("VALMER_PER_PAGE",5000)
+        existing_assets=msc.Asset.query(unique_identifier__in=unique_identifiers,per_page=per_page_assets)
         existing_assets={a.unique_identifier:a for a in existing_assets}
         uids_to_update=[]
         uids_to_update_pricing_details=[]
@@ -337,7 +336,7 @@ class ImportValmer(DataNode):
                 continue
 
             target_asset = existing_assets[u]
-            target_row = all_floating[all_floating.unique_identifier == u]
+            target_row = all_target_bonds[all_target_bonds.unique_identifier == u]
             if  target_row.empty ==True:
                 # Note only adding instrument details for floaters
                 continue
@@ -364,8 +363,8 @@ class ImportValmer(DataNode):
 
         instrument_pricing_detail_map={}
 
-        for i in range(0, len(uids_to_update), batch_size):
-            batch_identifiers = uids_to_update[i:i + batch_size]
+        for i in range(0, len(uids_to_update), per_page_assets):
+            batch_identifiers = uids_to_update[i:i + per_page_assets]
             assets_payload = []
 
             for identifier in batch_identifiers:
@@ -379,13 +378,14 @@ class ImportValmer(DataNode):
                 }
                 assets_payload.append(payload_item)
                 row=df_latest[df_latest['unique_identifier']==identifier].iloc[0]
-                if "TIIE" in str(row["subyacente"]) or "CETE" in str(row["subyacente"]):
+                if row["unique_identifier"] in all_target_bonds["unique_identifier"].to_list():
                     if str(row["reglacupon"]) =="0":
                         continue #Todo not implemented zero
+                    icalendar, business_day_convention, settlement_days, day_count = get_instrument_conventions(row)
 
-                    ql_bond=build_qll_floater_from_row(row=row,
-                                                       calendar=ql.Mexico(), dc=ql.Actual360(),
-                                                       bdc=ql.ModifiedFollowing, settlement_days=0,
+                    ql_bond=build_qll_bond_from_row(row=row,
+                                                       calendar=icalendar, dc=day_count,
+                                                       bdc=business_day_convention, settlement_days=settlement_days,
                                                        )
                     instrument_pricing_detail_map[identifier]={"instrument":ql_bond,
                                                                "pricing_details_date":row["fecha"]
@@ -395,7 +395,7 @@ class ImportValmer(DataNode):
             if not assets_payload:
                 continue
 
-            self.logger.info(f"Getting or registering assets in batch {i // batch_size + 1}/{len(uids_to_update)//batch_size}...")
+            self.logger.info(f"Getting or registering assets in batch {i // per_page_assets + 1}/{len(uids_to_update)//per_page_assets}...")
             try:
                 assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
                 registered_assets.extend(assets)

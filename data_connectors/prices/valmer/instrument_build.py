@@ -10,9 +10,10 @@ import re
 from tqdm import tqdm
 from contextlib import contextmanager
 
+import mainsequence.instruments as msi
+
 from mainsequence.instruments.instruments import PositionLine, Position
-from mainsequence.instruments.pricing_models.indices import build_zero_curve
-from mainsequence.instruments.instruments.floating_rate_bond import FloatingRateBond
+import tempfile
 from mainsequence.instruments.settings import (TIIE_28_UID,TIIE_91_UID,TIIE_182_UID,TIIE_OVERNIGHT_UID,CETE_28_UID,
 CETE_182_UID
                           )
@@ -45,7 +46,7 @@ class BuiltBond:
     row_ix: int
     emisora: str
     serie: str
-    bond: FloatingRateBond          # your model
+    bond: msi.FloatingRateBond          # your model
     eval_date: dt.date
 
 
@@ -162,6 +163,8 @@ def compute_sheet_schedule_force_match(
     count_from_settlement=True, and include_boundary_for_count=True means that
     a payment on settlement is counted as "to collect".
     """
+
+
     # ---- helpers -------------------------------------------------------------
     def _adjust(d: dt.date, convention: int = bdc) -> dt.date:
         return pyd(calendar.adjust(qld(d), convention))
@@ -172,7 +175,7 @@ def compute_sheet_schedule_force_match(
     # ---- inputs --------------------------------------------------------------
     eval_date    = parse_val_date(row["fecha"])
     maturity_raw = parse_iso_date(row["fechavcto"])
-
+    maturity_pay = _adjust(maturity_raw) if adjust_maturity_date else maturity_raw
     # frequency in days (28, 30, 91, ...)
     freq_days = parse_coupon_days(row["freccpn"])
 
@@ -181,9 +184,21 @@ def compute_sheet_schedule_force_match(
         boundary = pyd(calendar.advance(qld(eval_date), settlement_days, ql.Days, bdc))
     else:
         boundary = eval_date
-    cmp_keep = (lambda d: d >= boundary) if include_boundary_for_count else (lambda d: d > boundary)
 
-    maturity_pay = _adjust(maturity_raw) if adjust_maturity_date else maturity_raw
+    # --- clamp boundary so it never sits to the right of the last insertable day ---
+    last_insertable = maturity_pay - dt.timedelta(days=1)
+    if include_boundary_for_count:
+        boundary_eff = min(boundary, maturity_pay)
+    else:
+        boundary_eff = min(boundary, last_insertable)
+
+    cmp_keep = (lambda d: d >= boundary_eff) if include_boundary_for_count else (lambda d: d > boundary_eff)
+
+
+
+
+
+
     coupons_left = int(row["cuponesxcobrar"]) if "cuponesxcobrar" in row and pd.notna(row["cuponesxcobrar"]) else None
     dias_trans   = int(row["diastransccpn"]) if pd.notna(row.get("diastransccpn")) else None
 
@@ -207,7 +222,7 @@ def compute_sheet_schedule_force_match(
                 prev_unadj -= dt.timedelta(days=1)
                 prev_adj = _adjust(prev_unadj, ql.Preceding)
 
-        if prev_adj < boundary:
+        if prev_adj < boundary_eff:
             break
         nat_desc.append(prev_adj)
         d = prev_adj
@@ -241,27 +256,34 @@ def compute_sheet_schedule_force_match(
     N = int(coupons_left)
 
     if natural_cnt < N:
-        # Need to ADD K missing dates with minimal impact.
-        # Insert them just before maturity, spaced 1 day apart:
+        # Need to ADD K missing dates with minimal impact: pack them just before maturity.
         K = N - natural_cnt
-        # Work backward from maturity by 1,2,... days; avoid duplicates.
         existing = set(future_dates)
         extra: List[dt.date] = []
-        day_offset = 1
+
+        # insertion window [lo, hi] inclusive
+        hi = last_insertable  # maturity - 1 day
+        lo = boundary_eff if include_boundary_for_count else (boundary_eff + dt.timedelta(days=1))
+
+        # if the window is empty or too tight, widen it just enough to fit K slices
+        span = (hi - lo).days + 1
+        if span < K:
+            lo = hi - dt.timedelta(days=K - 1)
+
+        cand = hi
+        safety = 0
         while len(extra) < K:
-            cand = maturity_pay - dt.timedelta(days=day_offset)
-            # Don’t go before boundary (otherwise not counted). If that happens, push closer to maturity.
-            if cand < boundary:
-                # If boundary is too close to maturity and we still need extras,
-                # keep stacking more dates between (boundary, maturity) by shrinking the gap (still 1-day apart).
-                cand = boundary if include_boundary_for_count else (boundary + dt.timedelta(days=1))
-            if cand not in existing and cand not in extra and cand < maturity_pay:
+            if (cand not in existing) and (cand not in extra) and (cand < maturity_pay):
                 extra.append(cand)
-            day_offset += 1
-        future_dates = sorted(set(future_dates + extra))  # now count == at least N
-        # If over-shot due to boundary/dupe handling, trim from the far end (closest to maturity)
-        if len(future_dates) > N:
-            future_dates = future_dates[:N]
+            cand -= dt.timedelta(days=1)
+            if cand < lo:
+                # move further left for the remaining slots; still bounded
+                cand = hi - dt.timedelta(days=len(extra))
+            safety += 1
+            if safety > 2000:
+                raise RuntimeError("Failed to insert extra dates (safety stop).")
+
+        future_dates = sorted(set(future_dates + extra))  # now count >= N, unique
 
     elif natural_cnt > N:
         # Need to DROP extra dates with minimal impact -> drop the last ones (closest to maturity).
@@ -527,7 +549,12 @@ def count_future_coupons(
     n = 0
     with ql_include_ref_events(include_ref_date_events):
         for cf in b.cashflows():
-            if ql.as_floating_rate_coupon(cf) is None:
+            if isinstance(b, ql.FloatingRateBond):
+                cpn = ql.as_floating_rate_coupon(cf)
+            else:
+                cpn = ql.as_fixed_rate_coupon(cf)
+
+            if cpn is None:
                 continue
             if not cf.hasOccurred(ref):  # one-arg form only
                 n += 1
@@ -537,7 +564,7 @@ def count_future_coupons(
 # =============================================================================
 # Build a QL floater from a sheet row + curve
 # =============================================================================
-def build_qll_floater_from_row(
+def build_qll_bond_from_row(
     row: pd.Series,
     *,
     calendar: ql.Calendar,
@@ -557,8 +584,7 @@ def build_qll_floater_from_row(
     raw_spread    = 0.0 if pd.isna(row["sobretasa"]) else float(row["sobretasa"])
     spread_decimal = (raw_spread / 100.0) if SPREAD_IS_PERCENT else raw_spread
 
-
-
+    coupon_rule=row["reglacupon"]
 
     # --- global QL settings ---
     ql.Settings.instance().evaluationDate = qld(eval_date)
@@ -572,30 +598,44 @@ def build_qll_floater_from_row(
         row,
         calendar=calendar,
         bdc=bdc,
-        default_freq_days=parse_coupon_period(row.get("FREC. CPN")),
+        default_freq_days=parse_coupon_period(row.get("freccpn")),
         settlement_days=settlement_days,  # ← add this
         count_from_settlement=COUNT_FROM_SETTLEMENT,  # ← and this (keeps your toggle)
         include_boundary_for_count=True,  # ← ven
     )
-    try:
-        floating_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["reglacupon"]]
-    except KeyError as e:
-        raise e
-    # --- your model (ensure it supports 'schedule=...') ---
-    frb = FloatingRateBond(
-        face_value=face_adj,
-        floating_rate_index_name=floating_rate_index_name,
-        spread=spread_decimal,
-        issue_date=issue_date,
-        maturity_date=maturity_date,
-        coupon_frequency=parse_coupon_period(row.get("freccpn")),
-        day_count=dc,
-        calendar=calendar,
-        business_day_convention=bdc,
-        settlement_days=settlement_days,
 
-        schedule=explicit_schedule,        # <— IMPORTANT
-    )
+    if coupon_rule == "Tasa Fija":  # Fixed Rate Bond
+
+        frb=msi.FixedRateBond(face_value=face_adj,
+                              coupon_rate=row["tasacupon"]/100,
+                            issue_date=issue_date,
+                            maturity_date=maturity_date,
+                            coupon_frequency=parse_coupon_period(row.get("freccpn")),
+                            day_count=dc,
+                            calendar=calendar,
+                            business_day_convention=bdc,
+                            settlement_days=settlement_days,
+                              schedule=explicit_schedule,
+                              )
+
+    else:  # floating rate bond
+        floating_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["reglacupon"]]
+
+        # --- your model (ensure it supports 'schedule=...') ---
+        frb = msi.FloatingRateBond(
+            face_value=face_adj,
+            floating_rate_index_name=floating_rate_index_name,
+            spread=spread_decimal,
+            issue_date=issue_date,
+            maturity_date=maturity_date,
+            coupon_frequency=parse_coupon_period(row.get("freccpn")),
+            day_count=dc,
+            calendar=calendar,
+            business_day_convention=bdc,
+            settlement_days=settlement_days,
+
+            schedule=explicit_schedule,
+        )
     frb.set_valuation_date( eval_date,)
 
     # --- assert/diagnose + (optionally) auto-fix the front boundary ---
@@ -677,59 +717,98 @@ def extract_future_cashflows(
 # =============================================================================
 
 
+def get_instrument_conventions(
+        row: pd.Series
+) -> Tuple[ql.Calendar, int, int, ql.DayCounter]:
+    """
+    Determines the correct QuantLib market conventions for a given instrument.
 
+    This function inspects the currency and underlying type of an instrument
+    to return the appropriate calendar, business day convention, settlement days,
+    and day count convention.
+
+    Args:
+        row: A pandas Series representing a single instrument, requiring at least
+             'monedaemision' and 'subyacente' fields.
+
+    Returns:
+        A tuple containing:
+        (ql.Calendar, business_day_convention, settlement_days, ql.DayCounter)
+
+    Raises:
+        NotImplementedError: If the currency is not supported.
+        ValueError: If the underlying type is not supported for a given currency.
+    """
+    currency = row["monedaemision"]
+    subyacente = row["subyacente"]
+
+    if currency == "MPS":  # Mexican Peso
+        calendar = ql.Mexico(ql.Mexico.BMV)
+
+        # Check for standard Mexican money market and short-term instruments
+        if any(keyword in subyacente for keyword in ["Bonos M", "CETE"]):
+            business_day_convention = ql.Following
+            settlement_days = 1  # T+1 is standard for these
+            day_count = ql.Actual360()
+
+        elif any(keyword in subyacente for keyword in ["TIIE"]):
+            calendar = ql.Mexico(ql.Mexico.BMV)
+            day_count = ql.Actual360()
+            business_day_convention = ql.Following
+            settlement_days = 1
+        else:
+            # If the currency is supported but the instrument type is not, raise a specific error
+            raise ValueError(f"Unsupported 'subyacente' for currency '{currency}': {subyacente}")
+
+        return calendar, business_day_convention, settlement_days, day_count
+    else:
+        # If the currency is not recognized, raise an error
+        raise NotImplementedError(f"Conventions for currency '{currency}' are not implemented.")
 
 
 def run_price_check(
-    TIIE_BONDS: pd.DataFrame,
+    bonos_df: pd.DataFrame,
     *,
     SPREAD_IS_PERCENT: bool = True,
     price_tol_bp: float = 2.0,
-    coupon_tol_bp: float = 1.0,  # (kept for symmetry; not used directly here)
-) -> Tuple[pd.DataFrame, Dict[str, FloatingRateBond]]:
+) -> Tuple[pd.DataFrame, Dict[str, msi.Instrument]]:
     results: List[Dict[str, Any]] = []
-    instrument_map: Dict[str, FloatingRateBond] = {}
-    curve_cache: Dict[(dt.date,str), ql.YieldTermStructure] = {}
+    instrument_map: Dict[str, msi.Instrument] = {}
 
-    for ix, row in tqdm(TIIE_BONDS.iterrows(), desc="building instruments"):
-        eval_date = parse_val_date(row["FECHA"])
+    for ix, row in tqdm(bonos_df.iterrows(), desc="building instruments"):
+        eval_date = parse_val_date(row["fecha"])
         eval_date=dt.datetime(eval_date.year,eval_date.month,eval_date.day,tzinfo=pytz.utc)
-        # Build/reuse curve for that eval date
-        index_uid = SUBYACENTE_TO_INDEX_MAP[row["SUBYACENTE"]]
-        cached_id=(eval_date,index_uid)
-        if cached_id not in curve_cache:
 
-            curve_cache[cached_id] = build_zero_curve(target_date=eval_date,
-                                                      index_identifier=index_uid)
-        curve = curve_cache[cached_id]
 
-        if row["CUPON ACTUAL"] == 0.0 or row["CUPONES X COBRAR"] == 0:
+        if row["cuponactual"] == 0.0 or row["cuponesxcobrar"] == 0:
             continue
 
+        icalendar, business_day_convention, settlement_days, day_count=get_instrument_conventions(row)
+
         # Build bond (explicit schedule)
-        built = build_qll_floater_from_row(
+        bond = build_qll_bond_from_row(
             row,
-            calendar=ql.Mexico(), dc=ql.Actual360(), bdc=ql.ModifiedFollowing, settlement_days=0,
+            calendar=icalendar, dc=day_count, bdc=business_day_convention, settlement_days=settlement_days,
         )
 
         # Model analytics (force construction)
         try:
-            analytics = built.bond.analytics(with_yield=float(row["TASA DE RENDIMIENTO"]) / 100.0)
+            analytics = bond.analytics(with_yield=float(row["tasaderendimiento"]) / 100.0)
         except Exception as e:
             # Some FRNs with CUPONES X COBRAR == 0 might not be representable as FloatingRateBond.
             raise e
 
-        ql_bond = built.bond._bond  # underlying QL object
+        ql_bond = bond.get_ql_bond()  # underlying QL object
 
-        face    = float(row["VALOR NOMINAL ACTUALIZADO"])
+        face    = float(row["valornominalactualizado"])
         model_dirty = float(analytics["dirty_price"]) * face / 100.0
         model_clean = float(analytics["clean_price"]) * face / 100.0
         model_accr  = model_dirty - model_clean
         model_accr_per100 = 100.0 * (model_accr / face)
 
         # Market sheet dirty/clean (per 100)
-        mkt_dirty = float(row["PRECIO SUCIO"])
-        mkt_clean = float(row["PRECIO LIMPIO"])
+        mkt_dirty = float(row["preciosucio"])
+        mkt_clean = float(row["preciolimpio"])
         if mkt_dirty == 0:
             continue
 
@@ -739,12 +818,15 @@ def run_price_check(
         if ql_bond.cashflows():
             ref_for_days = ql_bond.settlementDate() if COUNT_FROM_SETTLEMENT else qld(eval_date)
             for cf in ql_bond.cashflows():
-                cpn = ql.as_floating_rate_coupon(cf)
+                if isinstance(ql_bond,ql.FloatingRateBond):
+                    cpn = ql.as_floating_rate_coupon(cf)
+                else:
+                    cpn=ql.as_fixed_rate_coupon(cf)
                 if cpn is None:
                     continue
                 if cpn.accrualStartDate() <= ref_for_days < cpn.accrualEndDate():
                     running_coupon_model = 100.0 * float(cpn.rate())
-                    dc_inst = built.bond.day_count
+                    dc_inst = bond.day_count
                     dias_transcurridos = int(dc_inst.dayCount(cpn.accrualStartDate(), ref_for_days))
                     break
 
@@ -754,26 +836,28 @@ def run_price_check(
             from_settlement=COUNT_FROM_SETTLEMENT,
             include_ref_date_events=INCLUDE_REF_DATE_EVENTS
         )
-        expected_count = int(row["CUPONES X COBRAR"]) if not pd.isna(row.get("CUPONES X COBRAR")) else np.nan
 
+        expected_count = int(row["cuponesxcobrar"]) if not pd.isna(row.get("cuponesxcobrar")) else np.nan
+
+        # df=bond.get_cashflows_df()
         # Diffs
         price_diff_bp  = 100.0 * (model_dirty - mkt_dirty) / mkt_dirty
-        coupon_diff_bp = ((running_coupon_model - float(row["CUPON ACTUAL"])) * 100.0
+        coupon_diff_bp = ((running_coupon_model - float(row["cuponactual"])) * 100.0
                           if not np.isnan(running_coupon_model) else np.nan)
         pass_price     = abs(price_diff_bp) <= price_tol_bp
         pass_cpn_count = (np.isnan(expected_count) or (future_cpn_count == expected_count))
 
-        instrument_hash= built.bond.content_hash()
+        instrument_hash= bond.content_hash()
         results.append({
             "instrument_hash": instrument_hash,
 
             "FECHA": eval_date,
-            "UID":f"{row['TIPO VALOR']}_{row['EMISORA']}_{row['SERIE']}",
-            "SUBYACENTE":row["SUBYACENTE"],
-            "VALOR NOMINAL": float(row["VALOR NOMINAL"]),
-            "SOBRETASA_in": float(row["SOBRETASA"]),
-            "SOBRETASA_decimal": (float(row["SOBRETASA"]) / 100.0) if SPREAD_IS_PERCENT and not pd.isna(row["SOBRETASA"]) else float(row["SOBRETASA"] or 0.0),
-            "CUPON ACTUAL (sheet) %": float(row["CUPON ACTUAL"]),
+            "UID":f"{row['tipovalor']}_{row['emisora']}_{row['serie']}",
+            "SUBYACENTE":row["subyacente"],
+            "VALOR NOMINAL": float(row["valornominal"]),
+            "SOBRETASA_in": float(row["sobretasa"]),
+            "SOBRETASA_decimal": (float(row["sobretasa"]) / 100.0) if SPREAD_IS_PERCENT and not pd.isna(row["sobretasa"]) else float(row["sobretasa"] or 0.0),
+            "CUPON ACTUAL (sheet) %": float(row["cuponactual"]),
             "CUPON ACTUAL (model) %": running_coupon_model,
             "coupon_diff_bp": coupon_diff_bp,
             "PRECIO SUCIO (sheet)": mkt_dirty,
@@ -786,14 +870,21 @@ def run_price_check(
             "CUPONES FUTUROS (model)": future_cpn_count,
             "pass_price": pass_price,
             "pass_coupon_count": pass_cpn_count,
-            "DIAS TRANSC. CPN (sheet)": int(row["DIAS TRANSC. CPN"]) if pd.notna(row.get("DIAS TRANSC. CPN")) else np.nan,
+            "DIAS TRANSC. CPN (sheet)": int(row["diastransccpn"]) if pd.notna(row.get("diastransccpn")) else np.nan,
             "DIAS TRANSC. CPN (model)": dias_transcurridos,
         })
 
-        instrument_map[instrument_hash] = {"instrument":built.bond,"extra_market_info":{"yield":row["TASA DE RENDIMIENTO"]/100}}
+        instrument_map[instrument_hash] = {"instrument":bond,"extra_market_info":{"yield":row["tasaderendimiento"]/100}}
 
     return pd.DataFrame(results), instrument_map
 
+def normalize_column_name(col_name: str) -> str:
+    """
+    Removes special characters and newlines from a string and converts it to lowercase.
+    """
+    # Replace newlines and then remove all non-alphanumeric characters
+    cleaned_name = str(col_name).replace('\n', ' ')
+    return re.sub(r'[^a-z0-9]', '', cleaned_name.lower())
 
 def build_position_from_sheet(
     sheet_path: str | Path,
@@ -805,12 +896,18 @@ def build_position_from_sheet(
     Build instruments from a vendor sheet and dump a 'position.json'-style file.
     Returns (Position, cfg_dict, position_json_path, df_out_csv_path).
     """
+    from data_connectors.settings import PROJECT_BUCKET_NAME
+
     sheet_path = str(sheet_path)
     df = pd.read_excel(sheet_path)
+    df.columns = [normalize_column_name(col) for col in df.columns]
 
-    floating_tiie  = df[df["SUBYACENTE"].astype(str).str.contains("TIIE", na=False)]
-    floating_cetes = df[df["SUBYACENTE"].astype(str).str.contains("CETE", na=False)]
-    all_floating   = pd.concat([floating_tiie, floating_cetes], axis=0, ignore_index=True)
+    floating_tiie  = df[df["subyacente"].astype(str).str.contains("TIIE", na=False)]
+    floating_cetes = df[df["subyacente"].astype(str).str.contains("CETE", na=False)]
+    m_bono_fixed_0 = df[df["subyacente"].astype(str).str.contains("Bonos M", na=False)]
+    m_bono_fixed_0=m_bono_fixed_0[m_bono_fixed_0.monedaemision=="MPS"]
+    all_floating   = pd.concat([floating_tiie, floating_cetes,m_bono_fixed_0], axis=0, ignore_index=True)
+
 
     df_out, instrument_map = run_price_check(all_floating)
     pd.set_option("display.float_format", lambda x: f"{x:,.6f}")
@@ -819,53 +916,22 @@ def build_position_from_sheet(
     ms_assets_map={k.unique_identifier:k.id for k in ms_assets_map}
 
     df_out["asset_id"]=df_out["UID"].map(ms_assets_map)
-    # Pick best priced instruments
-    position_instruments={}
-    hash_to_id_map=df_out[["instrument_hash","asset_id"]].set_index("instrument_hash").dropna()["asset_id"].to_dict()
-    for k, v in instrument_map.items():
 
-        if k in hash_to_id_map.keys():
-            #add main sequence asset
-            v["instrument"].main_sequence_asset_id=int(hash_to_id_map[k])
-            position_instruments[k]=v
 
-    # Units scaled by price from the model
-    position_lines = [
-        PositionLine(
-            units=int(notional_per_line / b["instrument"].price()),
-            **b
-        )
-        for b in position_instruments.values()
-    ]
-    position = Position(lines=position_lines)
+    with tempfile.NamedTemporaryFile(mode='w+', suffix='.csv', delete=True) as temp_csv:
+        temp_file_path = temp_csv.name
+        df_out.to_csv(temp_file_path, index=False)
 
-    # ---- THIS LINE (existing): build JSON dict --------------------------------
-    dump = position.to_json_dict()
+        scrap_source_artifact = msc.Artifact.get_or_create(bucket_name=PROJECT_BUCKET_NAME,
+                                                           name="instrument_pricing_match",
+                                                           created_by_resource_name=__file__,
+                                                           filepath=temp_file_path,
+                                                           )
 
-    # ---- : write position.json immediately after 'dump = ...' --------------
-    # Choose a valuation date from the selected rows (fallback: today)
-    if not df_out.empty:
-        val_ts = pd.to_datetime(df_out["FECHA"].max())
-        if isinstance(val_ts, pd.Timestamp) and val_ts.tzinfo is not None:
-            val_ts = val_ts.tz_convert(None)
-        val_date = val_ts.date() if isinstance(val_ts, pd.Timestamp) else pd.to_datetime(val_ts).date()
-    else:
-        val_date = dt.date.today()
 
-    cfg = {
-        "valuation": {"valuation_date": val_date.isoformat()},
-        "position": dump
-    }
 
-    # Default output next to the app's expected file
-    out_path = Path(out_path) if out_path is not None else (Path(__file__).resolve().parent / "position.json")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w") as fh:
-        json.dump(cfg, fh, indent=2, default=str)
 
-    # ---- NEW: also dump df_out in the SAME location as position.json ----------
-    df_out_path = out_path.parent / "df_out.csv"
-    df_out.to_csv(df_out_path, index=False)
 
-    return position, cfg, str(out_path), str(df_out_path)
+
+
 

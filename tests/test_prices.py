@@ -23,7 +23,7 @@ class TestTimeSerie(DataNode):
         )
         return full_data
 
-def test_valmer():
+def test_valmer_prices():
     from data_connectors.prices.valmer.time_series import ImportValmer
     BUCKET_NAME = "Vector de precios"
 
@@ -37,6 +37,13 @@ def test_valmer():
             debug_mode=True,
             force_update=True,
         )
+
+def test_valmer_vector_analytico_pricing():
+    from data_connectors.prices.valmer.instrument_build import build_position_from_sheet
+    import os
+    sheet_path=os.environ["VECTOR_ANALYTICO_PATH"]
+    build_position_from_sheet(sheet_path=sheet_path)
+
 
 def test_floating_portfolio_valmer():
     import mainsequence.client as msc
@@ -316,7 +323,7 @@ def test_banxico_tiie_fixing():
 # test_equity_market_cap()
 # test_binance_daily_bars()
 # test_alpaca_bars()
-# test_valmer()
+test_valmer_prices()
 
 # test_alpaca_bars_small()
 # test_banxico_mbonos()
@@ -327,7 +334,8 @@ def test_banxico_tiie_fixing():
 # test_equity_fundamentals()
 
 
-test_banxico_tiie_fixing()
-test_banxico_mbonos()
+# test_banxico_tiie_fixing()
+# test_banxico_mbonos()
 # test_discount_curves()
-test_floating_portfolio_valmer()
+# test_floating_portfolio_valmer()
+# test_valmer_vector_analytico_pricing()
