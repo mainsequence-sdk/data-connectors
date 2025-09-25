@@ -468,7 +468,7 @@ class ImportValmer(DataNode):
         ohlc_df['cuponactual'] = pd.to_numeric(source_data['cuponactual'], errors='coerce')
         ohlc_df['sobretasa'] = pd.to_numeric(source_data['sobretasa'], errors='coerce')
 
-
+        ohlc_df["tasaderendimiento"]=pd.to_numeric(source_data['tasaderendimiento'], errors='coerce')
 
 
         ohlc_df.set_index(["time_index", "unique_identifier"], inplace=True)
