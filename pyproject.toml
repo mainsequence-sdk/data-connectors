@@ -1,10 +1,40 @@
-# pyproject.toml (at repo root)
 [build-system]
 requires = [
   "setuptools>=61",
   "wheel",
   "tomli; python_version < '3.11'"
-  # optional extra fallback if you want:
-  # "toml; python_version < '3.11'"
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "data_connectors"
+version = "2.0.0"
+authors = [{ name = "Main Sequence GmbH" }]
+requires-python = ">=3.10.0"
+
+# From Pipfile [packages]
+dependencies = [
+  "mainsequence",
+  "python-dotenv",
+  "databento",
+  "xlrd",
+]
+
+# From Pipfile custom sections -> extras
+[project.optional-dependencies]
+"prices-alpaca" = [
+  "alpaca-py",
+]
+"prices-binance" = [
+  "python-binance",
+  "python-coinmarketcap",
+  "pycoingecko",
+  "ccxt",
+  "numba",
+  "minio",
+]
+
+# Mirror setuptools.find_packages(include=['data_connectors','data_connectors.*'])
+# so discovery matches your previous setup.py behavior.
+[tool.setuptools.packages.find]
+include = ["data_connectors", "data_connectors.*"]

@@ -1,7 +1,7 @@
+mainsequence
 python-dotenv
-pandas-market-calendars
-fire
 databento
+xlrd
 
 [prices-alpaca]
 alpaca-py
@@ -12,3 +12,4 @@ python-coinmarketcap
 pycoingecko
 ccxt
 numba
+minio

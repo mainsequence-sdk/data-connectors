@@ -2,12 +2,11 @@ Metadata-Version: 2.4
 Name: data_connectors
 Version: 2.0.0
 Author: Main Sequence GmbH
-Author-email: 
-Requires-Python: >=3.9.0
+Requires-Python: >=3.10.0
+Requires-Dist: mainsequence
 Requires-Dist: python-dotenv
-Requires-Dist: pandas-market-calendars
-Requires-Dist: fire
 Requires-Dist: databento
+Requires-Dist: xlrd
 Provides-Extra: prices-alpaca
 Requires-Dist: alpaca-py; extra == "prices-alpaca"
 Provides-Extra: prices-binance
@@ -16,7 +15,4 @@ Requires-Dist: python-coinmarketcap; extra == "prices-binance"
 Requires-Dist: pycoingecko; extra == "prices-binance"
 Requires-Dist: ccxt; extra == "prices-binance"
 Requires-Dist: numba; extra == "prices-binance"
-Dynamic: author
-Dynamic: provides-extra
-Dynamic: requires-dist
-Dynamic: requires-python
+Requires-Dist: minio; extra == "prices-binance"
