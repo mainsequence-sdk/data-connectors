@@ -294,21 +294,23 @@ def test_banxico_mbonos():
 
 def test_banxico_tiie_fixing():
     from data_connectors.interest_rates.nodes import FixingRatesNode,FixingRateConfig,RateConfig
-    from mainsequence.instruments.settings  import (TIIE_OVERNIGHT_UID,
-                                                         TIIE_28_UID,
-                                                         TIIE_91_UID,
-                                                         TIIE_182_UID,
-                                                    CETE_28_UID,CETE_91_UID,CETE_182_UID)
+    from mainsequence.client import Constant as _C
 
     fixing_config = FixingRateConfig(rates_config_list=[
-        RateConfig(unique_identifier=TIIE_OVERNIGHT_UID,
-                   name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_OVERNIGHT_UID}"),
-        RateConfig(unique_identifier=TIIE_28_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_28_UID}"),
-        RateConfig(unique_identifier=TIIE_91_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_91_UID}"),
-        RateConfig(unique_identifier=TIIE_182_UID, name=f"Interbank Equilibrium Interest Rate (TIIE) {TIIE_182_UID}"),
-        RateConfig(unique_identifier=CETE_28_UID, name=f"CETE 28 days {CETE_28_UID}"),
-        RateConfig(unique_identifier=CETE_91_UID, name=f"CETE 28 days {CETE_91_UID}"),
-        RateConfig(unique_identifier=CETE_182_UID, name=f"CETE 28 days {CETE_182_UID}"),
+        RateConfig(unique_identifier=_C.get_value("TIIE_OVERNIGHT_UID"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_OVERNIGHT_UID')}"),
+        RateConfig(unique_identifier=_C.get_value("TIIE_28_UID"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_28_UID')}"),
+        RateConfig(unique_identifier=_C.get_value("TIIE_91_UID"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_91_UID')}"),
+        RateConfig(unique_identifier=_C.get_value("TIIE_182_UID"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_182_UID')}"),
+        RateConfig(unique_identifier=_C.get_value("CETE_28_UID"),
+                   name=f"CETE 28 days {_C.get_value('CETE_28_UID')}"),
+        RateConfig(unique_identifier=_C.get_value("CETE_91_UID"),
+                   name=f"CETE 28 days {_C.get_value('CETE_91_UID')}"),
+        RateConfig(unique_identifier=_C.get_value("CETE_182_UID"),
+                   name=f"CETE 28 days {_C.get_value('CETE_182_UID')}"),
 
     ]
 
@@ -336,7 +338,7 @@ def test_polygon_data_nodes():
 # test_valmer_prices()
 
 # test_alpaca_bars_small()
-# test_banxico_mbonos()
+test_banxico_mbonos()
 
 # test_databento_bars_small()
 # test_databento_market_cap_small()
@@ -349,4 +351,4 @@ def test_polygon_data_nodes():
 # test_discount_curves()
 # test_floating_portfolio_valmer()
 # test_valmer_vector_analytico_pricing()
-test_polygon_data_nodes()
+# test_polygon_data_nodes()

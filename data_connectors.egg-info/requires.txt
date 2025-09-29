@@ -1,7 +1,9 @@
 mainsequence
 python-dotenv
-databento
 xlrd
+
+[data-bento]
+databento
 
 [prices-alpaca]
 alpaca-py

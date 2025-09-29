@@ -1,5 +1,6 @@
 from typing import Dict, Tuple, Optional, Union, List
-import  mainsequence.instruments.settings as instrument_settings
+import mainsequence.client as msc
+from mainsequence.client import Constant as _C
 # -----------------------------
 # Banxico series catalogs
 # -----------------------------
@@ -37,16 +38,24 @@ MONEY_MARKET_RATES={BANXICO_TARGET_RATE:"SF61745",
                     }
 
 
-TIIE_FIXING_ID_MAP={ instrument_settings.TIIE_OVERNIGHT_UID:"SF331451",
-                    instrument_settings.TIIE_28_UID:"SF43783",
-                    instrument_settings.TIIE_91_UID:"SF43783",
-                    instrument_settings.TIIE_182_UID:"SF111916"}
 
-CETE_FIXING_ID_MAP={instrument_settings.CETE_28_UID:"SF45470",
-                    instrument_settings.CETE_91_UID:"SF45471",
-                    instrument_settings.CETE_182_UID:"SF45472"
+
+
+TIIE_FIXING_ID_MAP={
+                    _C.get_value(name="TIIE_OVERNIGHT_UID"):"SF331451",
+                    _C.get_value(name="TIIE_28_UID"):"SF43783",
+                    _C.get_value(name="TIIE_91_UID"):"SF43783",
+                    _C.get_value(name="TIIE_182_UID"):"SF111916"
+                     }
+
+CETE_FIXING_ID_MAP={ _C.get_value(name="CETE_28_UID"):"SF45470",
+                     _C.get_value(name="CETE_91_UID"):"SF45471",
+                     _C.get_value(name="CETE_182_UID"):"SF45472"
 
                     }
+
+
+
 
 
 

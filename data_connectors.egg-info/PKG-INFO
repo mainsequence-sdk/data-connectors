@@ -5,10 +5,11 @@ Author: Main Sequence GmbH
 Requires-Python: >=3.10.0
 Requires-Dist: mainsequence
 Requires-Dist: python-dotenv
-Requires-Dist: databento
 Requires-Dist: xlrd
 Provides-Extra: prices-alpaca
 Requires-Dist: alpaca-py; extra == "prices-alpaca"
+Provides-Extra: data-bento
+Requires-Dist: databento; extra == "data-bento"
 Provides-Extra: prices-binance
 Requires-Dist: python-binance; extra == "prices-binance"
 Requires-Dist: python-coinmarketcap; extra == "prices-binance"

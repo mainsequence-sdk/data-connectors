@@ -778,13 +778,15 @@ name = "data-connectors"
 version = "2.0.0"
 source = { editable = "." }
 dependencies = [
-    { name = "databento" },
     { name = "mainsequence" },
     { name = "python-dotenv" },
     { name = "xlrd" },
 ]
 
 [package.optional-dependencies]
+data-bento = [
+    { name = "databento" },
+]
 prices-alpaca = [
     { name = "alpaca-py" },
 ]
@@ -801,7 +803,7 @@ prices-binance = [
 requires-dist = [
     { name = "alpaca-py", marker = "extra == 'prices-alpaca'" },
     { name = "ccxt", marker = "extra == 'prices-binance'" },
-    { name = "databento" },
+    { name = "databento", marker = "extra == 'data-bento'" },
     { name = "mainsequence" },
     { name = "minio", marker = "extra == 'prices-binance'" },
     { name = "numba", marker = "extra == 'prices-binance'" },
@@ -811,7 +813,7 @@ requires-dist = [
     { name = "python-dotenv" },
     { name = "xlrd" },
 ]
-provides-extras = ["prices-alpaca", "prices-binance"]
+provides-extras = ["prices-alpaca", "data-bento", "prices-binance"]
 
 [[package]]
 name = "databento"

@@ -23,6 +23,9 @@ data_connectors/helpers/asset_consistency.py
 data_connectors/helpers/s3_utils.py
 data_connectors/interest_rates/__init__.py
 data_connectors/interest_rates/nodes.py
+data_connectors/interest_rates/registries/__init__.py
+data_connectors/interest_rates/registries/discount_curves.py
+data_connectors/interest_rates/registries/fixing_rates.py
 data_connectors/notebooks/__init__.py
 data_connectors/prices/__init__.py
 data_connectors/prices/utils.py
@@ -39,6 +42,13 @@ data_connectors/prices/binance/time_series.py
 data_connectors/prices/binance/utils.py
 data_connectors/prices/databento/__init__.py
 data_connectors/prices/databento/time_series.py
+data_connectors/prices/fred/__init__.py
+data_connectors/prices/fred/utils.py
+data_connectors/prices/polygon/__init__.py
+data_connectors/prices/polygon/builders.py
+data_connectors/prices/polygon/data_nodes.py
+data_connectors/prices/polygon/settings.py
+data_connectors/prices/polygon/utils.py
 data_connectors/prices/valmer/__init__.py
 data_connectors/prices/valmer/instrument_build.py
 data_connectors/prices/valmer/time_series.py
