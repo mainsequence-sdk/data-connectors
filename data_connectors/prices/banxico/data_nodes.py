@@ -26,10 +26,6 @@ UTC = pytz.utc
 # -----------------------------
 
 
-
-
-
-
 class BanxicoMXNOTR(DataNode):
     """
     Pulls historical price & yield for Mexican Mbonos from the Banxico SIE API.

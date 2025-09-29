@@ -317,13 +317,23 @@ def test_banxico_tiie_fixing():
     ts=FixingRatesNode(rates_config=fixing_config)
     ts.run(debug_mode=True, force_update=True)
 
+def test_polygon_data_nodes():
+    from data_connectors.prices.polygon.data_nodes import PolygonUSTCMTYields
+
+    data_node=PolygonUSTCMTYields()
+    data_node.run(debug_mode=True, force_update=True)
+
+
+
+
+
 # test_api_time_series()
 # test_binance_bars_from_trades()
 # test_crypto_market_cap()
 # test_equity_market_cap()
 # test_binance_daily_bars()
 # test_alpaca_bars()
-test_valmer_prices()
+# test_valmer_prices()
 
 # test_alpaca_bars_small()
 # test_banxico_mbonos()
@@ -339,3 +349,4 @@ test_valmer_prices()
 # test_discount_curves()
 # test_floating_portfolio_valmer()
 # test_valmer_vector_analytico_pricing()
+test_polygon_data_nodes()

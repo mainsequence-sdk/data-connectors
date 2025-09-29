@@ -12,17 +12,15 @@ from typing import Dict, Any, List, Union, Optional
 import gzip
 import base64
 from pydantic import BaseModel,Field
-from data_connectors.prices.valmer.utils import build_tiie_valmer
-from data_connectors.prices.banxico import( TIIE_FIXING_BUILD_MAP, boostrap_mbono_curve,
-                                            CETE_FIXING_BUILD_MAP)
-
 import datetime
 import pandas as pd
 
 
+from data_connectors.interest_rates.registries.discount_curves import DISCOUNT_CURVE_BUILD_REGISTRY
+from data_connectors.interest_rates.registries.fixing_rates import FIXING_RATE_BUILD_REGISTRY
+from data_connectors.interest_rates.registries.constants import TIIE_28_ZERO_CURVE, M_BONOS_ZERO_OTR
 
-TIIE_28_ZERO_CURVE="F_TIIE_28_VALMER"
-M_BONOS_ZERO_OTR="M_BONOS_ZERO_OTR"
+
 UTC = pytz.UTC
 
 class CurveConfig(BaseModel):
@@ -101,17 +99,6 @@ def decompress_string_to_curve(b64_string: str) -> Dict[Any, Any]:
 
     # 4. Decode the JSON bytes to a string and parse back into a dictionary
     return json.loads(json_bytes.decode('utf-8'))
-
-
-
-DISCOUNT_CURVE_BUILD_REGISTRY={TIIE_28_ZERO_CURVE:build_tiie_valmer,
-                               M_BONOS_ZERO_OTR:boostrap_mbono_curve,
-                               }
-FIXING_RATE_BUILD_REGISTRY={}
-FIXING_RATE_BUILD_REGISTRY.update(TIIE_FIXING_BUILD_MAP)
-FIXING_RATE_BUILD_REGISTRY.update(CETE_FIXING_BUILD_MAP)
-
-
 
 
 
@@ -209,9 +196,9 @@ class FixingRatesNode(DataNode):
         super().__init__(*args, **kwargs)
 
     def get_asset_list(self):
-
+        assets_payload = []
         for config in self.rates_config.rates_config_list:
-            assets_payload = []
+
             snapshot = {
                 "name": config.name,
                 "ticker": config.unique_identifier,
