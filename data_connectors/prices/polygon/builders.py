@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from mainsequence.tdag import APIDataNode
+
 
 def _build_loglinear_df_func(pillars: dict[float, float]):
     xs = np.array(sorted(pillars.keys()), dtype=float)
@@ -108,84 +110,52 @@ def bootstrap_zero_from_cmt(curve_df: pd.DataFrame, day_count: float = 365.0, co
     tenors = np.array(sorted(pillars.keys())); dfs = np.array([pillars[t] for t in tenors])
     mask = tenors > 0
     T = tenors[mask]; DF = dfs[mask]
-    zeros = ((1.0 / DF) - 1.0) * (day_count / T) * 100.0
+    zeros = ((1.0 / DF) - 1.0) * (day_count / T)
     return pd.DataFrame({"days_to_maturity": T.astype(int), "zero_rate": zeros}).sort_values("days_to_maturity").reset_index(drop=True)
 
-def bootstrap_zero_from_cmt(curve_df: pd.DataFrame, day_count: float = 365.0, coupons_per_year: int = 2) -> pd.DataFrame:
+def bootstrap_cmt_curve(update_statistics, curve_unique_identifier: str, base_node_curve_points:APIDataNode):
     """
-    Input (single time_index slice): ['days_to_maturity','par_yield'] in decimal.
-    Policy:
-      - T < 365d: money-market zero (Act/365)
-      - T >= 365d: par yields with semiannual coupons (Act/365), price=100
-    Output: ['days_to_maturity','zero_rate'] in percent.
+    For each time_index:
+      1) Reads node data from `base_node_curve_points` since the last_update.
+      2) Bootstraps the zero curve using `bootstrap_zero_from_cmt`.
+      3) Returns one dataframe with:
+         - MultiIndex ("time_index", "unique_identifier")
+         - Column "curve": dict[days_to_maturity] → zero_rate (percent)
     """
-    df = curve_df.copy()
-    df["days_to_maturity"] = pd.to_numeric(df["days_to_maturity"], errors="coerce").astype(float)
-    df["par_yield"] = pd.to_numeric(df["par_yield"], errors="coerce")
-    df = df.dropna().sort_values("days_to_maturity")
+    last_update = update_statistics.asset_time_statistics[curve_unique_identifier]
 
-    # Pillars map tenor_days -> DF; start with DF(0)=1
-    pillars: dict[float, float] = {0.0: 1.0}
-
-    # 1) Build DFs for all provided tenors
-    for _, r in df.iterrows():
-        T = float(r["days_to_maturity"])
-        y = float(r["par_yield"])
-
-        if T < 365.0:
-            # Money-market (Act/365) zero for bills region
-            df_T = 1.0 / (1.0 + y * (T / day_count))
-            pillars[T] = max(1e-12, min(df_T, 1.0))
-            continue
-
-        # Coupon-bearing region: solve DF(T) with log-linear DF between pillars
-        step = day_count / coupons_per_year  # ~182.5
-        k = int(np.floor(T / step))
-        coupon_times = list(step * np.arange(1, k + 1))
-        if coupon_times and np.isclose(coupon_times[-1], T, atol=1e-8):
-            coupon_times = coupon_times[:-1]
-
-        last_coupon = coupon_times[-1] if coupon_times else 0.0
-        alpha_T = (T - last_coupon) / day_count
-        c_amt = (y / coupons_per_year) * 100.0
-        final_cf = 100.0 + y * alpha_T * 100.0
-
-        df_func = _build_loglinear_df_func(pillars)
-        S = max(pillars.keys())
-
-        pre_known_sum, between = 0.0, []
-        for t in coupon_times:
-            if t <= S + 1e-12:
-                pre_known_sum += c_amt * df_func(t)
-            else:
-                between.append(t)
-
-        if T <= S + 1e-12:
-            df_T = df_func(T)
-        else:
-            df_T = _solve_df_T_loglinear(
-                price=100.0, pre_known_sum=pre_known_sum,
-                df_S=df_func(S), S=S, T=T,
-                coupon_dates_between_S_T=between, coupon_amt=c_amt, final_cf=final_cf
-            )
-        pillars[T] = max(1e-12, min(df_T, df_func(S)))
-
-    # 2) --- ENSURE A 1-DAY PILLAR (derived from Polygon CMT pillars) ---
-    if 1.0 not in pillars and len(pillars) >= 2:
-        # Build an interpolator over current pillars and evaluate at 1 day
-        df_func_short = _build_loglinear_df_func(pillars)
-        pillars[1.0] = df_func_short(1.0)
-
-    # 3) Convert DFs -> money-market zero rates (percent)
-    tenors = np.array(sorted(pillars.keys()))
-    dfs = np.array([pillars[t] for t in tenors])
-    mask = tenors > 0
-    T = tenors[mask]
-    DF = dfs[mask]
-    zeros = ((1.0 / DF) - 1.0) * (day_count / T) * 100.0
-
-    return (
-        pd.DataFrame({"days_to_maturity": T.astype(int), "zero_rate": zeros})
-        .sort_values("days_to_maturity")
-        .reset_index(drop=True)
+    cmt_input_df = base_node_curve_points.get_df_between_dates(
+        start_date=last_update,
+        great_or_equal=True
     )
+
+    if cmt_input_df.empty:
+        return pd.DataFrame()
+
+    results = []
+
+    for time_index, curve_df in cmt_input_df.groupby("time_index"):
+        curve_df = curve_df.copy()
+        curve_df["days_to_maturity"] = pd.to_numeric(curve_df["days_to_maturity"], errors="coerce")
+        curve_df["par_yield"] = pd.to_numeric(curve_df["par_yield"], errors="coerce")
+
+        try:
+            zero_df = bootstrap_zero_from_cmt(curve_df)
+        except Exception as e:
+            raise e
+
+        zero_df.insert(0, "time_index", time_index)
+        zero_df.insert(1, "unique_identifier", curve_unique_identifier)
+        results.append(zero_df)
+
+    final_df = pd.concat(results, ignore_index=True)
+
+    grouped = (
+        final_df.groupby(["time_index", "unique_identifier"])
+        .apply(lambda g: g.set_index("days_to_maturity")["zero_rate"].to_dict())
+        .rename("curve")
+        .reset_index()
+        .set_index(["time_index", "unique_identifier"])
+    )
+
+    return grouped

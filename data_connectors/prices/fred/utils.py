@@ -95,14 +95,13 @@ def fred_to_long_with_aliases(
     return pd.DataFrame.from_records(recs)
 
 
-# --- main Banxico-like updater for FRED ---
+
+
 def _update_fred_fixings(
     *,
     update_statistics,
     unique_identifier: str,
     id_map: Mapping[str, str],
-    instrument_label: str,
-    value_to_rate: Optional[Callable[[pd.Series], pd.Series]] = None,
 ) -> pd.DataFrame:
     """
     Generic FRED fixing updater.
@@ -113,13 +112,13 @@ def _update_fred_fixings(
         MultiIndex (time_index, unique_identifier) with a single 'rate' column (decimal).
     """
     # 0) Validate + token
-    assert unique_identifier in id_map, f"Invalid unique identifier for {instrument_label}"
+    assert unique_identifier in id_map, f"Invalid unique identifier for {unique_identifier}"
     api_key = os.getenv("FRED_API_KEY")
     if not api_key:
         raise RuntimeError("FRED_API_KEY environment variable is required for FRED access.")
 
-    if value_to_rate is None:
-        value_to_rate = lambda s: s / 100.0  # FRED rates are typically percent → decimal
+
+    value_to_rate = lambda s: s / 100.0  # FRED rates are typically percent → decimal
 
     # 1) Update window: from last+1d to “yesterday 00:00 UTC”
     yday = (

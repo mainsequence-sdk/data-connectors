@@ -150,18 +150,29 @@ def test_floating_portfolio_valmer():
 
 def test_discount_curves():
     from data_connectors.interest_rates.nodes import (DiscountCurves,CurveConfig,
-                                                      TIIE_28_ZERO_CURVE,)
-    from mainsequence.instruments.settings import ( M_BONOS_ZERO_CURVE)
-    from data_connectors.prices.banxico.settings import ON_THE_RUN_DATA_NODE_UID
-    config=CurveConfig(unique_identifier=TIIE_28_ZERO_CURVE,
-                       name="Discount Curve TIIE 28 Mexder Valmer",
-                       )
-    node=DiscountCurves(curve_config=config)
-    node.run(debug_mode=True,force_update=True)
+                                                      )
+    from mainsequence.client import Constant as _C
+    from data_connectors.prices.banxico.settings import ON_THE_RUN_DATA_NODE_TABLE_NAME
+    from data_connectors.prices.polygon.settings import UST_CMT_YIELDS_TABLE_UID
 
-    config = CurveConfig(unique_identifier=M_BONOS_ZERO_CURVE,
-                         name="Discount Curve M Bonos Banxico Boostrapped",
-    curve_points_dependecy_data_node_uid=ON_THE_RUN_DATA_NODE_UID
+    # config=CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__VALMER_TIIE_28"),
+    #                    name="Discount Curve TIIE 28 Mexder Valmer",
+    #                    )
+    # node=DiscountCurves(curve_config=config)
+    # node.run(debug_mode=True,force_update=True)
+    #
+    # config = CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__BANXICO_M_BONOS_OTR"),
+    #                      name="Discount Curve M Bonos Banxico Boostrapped",
+    # curve_points_dependecy_data_node_uid=ON_THE_RUN_DATA_NODE_TABLE_NAME
+    #                      )
+    # node = DiscountCurves(curve_config=config)
+    # node.run(debug_mode=True, force_update=True)
+    #
+    #
+    config = CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__UST_CMT_ZERO_CURVE_UID"),
+                         name="Discount Curve UST Bootstrapped",
+    curve_points_dependecy_data_node_uid=UST_CMT_YIELDS_TABLE_UID
+
                          )
     node = DiscountCurves(curve_config=config)
     node.run(debug_mode=True, force_update=True)
@@ -291,6 +302,27 @@ def test_banxico_mbonos():
 
     ts=BanxicoMXNOTR()
     ts.run(debug_mode=True, force_update=True)
+def text_fred_fixing():
+    from data_connectors.interest_rates.nodes import FixingRatesNode, FixingRateConfig, RateConfig
+    from mainsequence.client import Constant as _C
+
+    USD_SOFR = _C.get_value(name="REFERENCE_RATE__USD_SOFR")
+    USD_EFFR = _C.get_value(name="REFERENCE_RATE__USD_EFFR")
+    USD_OBFR = _C.get_value(name="REFERENCE_RATE__USD_OBFR")
+    fixing_config = FixingRateConfig(rates_config_list=[
+    RateConfig(unique_identifier=USD_SOFR,
+               name=f"Secured Overnight Financing Rate "),
+    RateConfig(unique_identifier=USD_EFFR,
+               name=f"Effective Federal Funds Rate "),
+    RateConfig(unique_identifier=USD_OBFR,
+               name=f"Overnight Bank Funding Rate"),
+        ])
+    ts = FixingRatesNode(rates_config=fixing_config)
+    ts.run(debug_mode=True, force_update=True)
+
+    ts = FixingRatesNode(rates_config=fixing_config)
+    ts.run(debug_mode=True, force_update=True)
+
 
 def test_banxico_tiie_fixing():
     from data_connectors.interest_rates.nodes import FixingRatesNode,FixingRateConfig,RateConfig
@@ -308,9 +340,9 @@ def test_banxico_tiie_fixing():
         RateConfig(unique_identifier=_C.get_value("CETE_28_UID"),
                    name=f"CETE 28 days {_C.get_value('CETE_28_UID')}"),
         RateConfig(unique_identifier=_C.get_value("CETE_91_UID"),
-                   name=f"CETE 28 days {_C.get_value('CETE_91_UID')}"),
+                   name=f"CETE 91 days {_C.get_value('CETE_91_UID')}"),
         RateConfig(unique_identifier=_C.get_value("CETE_182_UID"),
-                   name=f"CETE 28 days {_C.get_value('CETE_182_UID')}"),
+                   name=f"CETE 182 days {_C.get_value('CETE_182_UID')}"),
 
     ]
 
@@ -319,7 +351,7 @@ def test_banxico_tiie_fixing():
     ts=FixingRatesNode(rates_config=fixing_config)
     ts.run(debug_mode=True, force_update=True)
 
-def test_polygon_data_nodes():
+def test_polygon_cmt_UST_nodes():
     from data_connectors.prices.polygon.data_nodes import PolygonUSTCMTYields
 
     data_node=PolygonUSTCMTYields()
@@ -338,7 +370,6 @@ def test_polygon_data_nodes():
 # test_valmer_prices()
 
 # test_alpaca_bars_small()
-test_banxico_mbonos()
 
 # test_databento_bars_small()
 # test_databento_market_cap_small()
@@ -346,9 +377,14 @@ test_banxico_mbonos()
 # test_equity_fundamentals()
 
 
-# test_banxico_tiie_fixing()
-# test_banxico_mbonos()
-# test_discount_curves()
+
 # test_floating_portfolio_valmer()
 # test_valmer_vector_analytico_pricing()
 # test_polygon_data_nodes()
+
+#fixed income
+# test_banxico_tiie_fixing()
+# test_banxico_mbonos()
+# test_discount_curves()
+# test_polygon_cmt_UST_nodes()
+text_fred_fixing()

@@ -5,9 +5,9 @@ from typing import Callable, Dict, Mapping
 
 # Banxico sources (MXN fixings)
 from data_connectors.prices.banxico import TIIE_FIXING_BUILD_MAP, CETE_FIXING_BUILD_MAP
+from data_connectors.prices.fred import USD_FRED_FIXING_BUILD_MAP
 
-# FRED (USD references, e.g., SOFR)
-from data_connectors.prices.fred.utils import USD_FRED_FIXING_BUILD_MAP
+
 
 def _merge_unique(*maps: Mapping[str, Callable]) -> Dict[str, Callable]:
     out: Dict[str, Callable] = {}
@@ -22,5 +22,5 @@ def _merge_unique(*maps: Mapping[str, Callable]) -> Dict[str, Callable]:
 FIXING_RATE_BUILD_REGISTRY: Dict[str, Callable] = _merge_unique(
     TIIE_FIXING_BUILD_MAP,
     CETE_FIXING_BUILD_MAP,
-    USD_FRED_FIXING_BUILD_MAP,  # include if you added the FRED updater
+USD_FRED_FIXING_BUILD_MAP,
 )

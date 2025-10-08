@@ -14,10 +14,9 @@ import mainsequence.instruments as msi
 
 from mainsequence.instruments.instruments import PositionLine, Position
 import tempfile
-from mainsequence.instruments.settings import (TIIE_28_UID,TIIE_91_UID,TIIE_182_UID,TIIE_OVERNIGHT_UID,CETE_28_UID,
-CETE_182_UID
-                          )
+
 import mainsequence.client as msc
+from mainsequence.client import Constant as _C
 import pytz
 import json
 from pathlib import Path
@@ -28,14 +27,14 @@ from pathlib import Path
 COUNT_FROM_SETTLEMENT: bool = True     # vendor sheets often count from settlement (T+1/T+2)
 INCLUDE_REF_DATE_EVENTS: bool = False  # treat flows ON ref date as already occurred (QL default)
 
-SUBYACENTE_TO_INDEX_MAP = {"TIIE28": TIIE_28_UID,
-                           "TIIE182": TIIE_182_UID,
-                           "TIIE91": TIIE_91_UID,
-                           "TIIE28 EQUIV 182": TIIE_182_UID,
-                           "Tasa TIIE Fondeo 1D": TIIE_OVERNIGHT_UID,
-                           "CETE_28": CETE_28_UID,
-                           "CETE28": CETE_28_UID,
-                           "CETE182": CETE_182_UID,
+SUBYACENTE_TO_INDEX_MAP = {"TIIE28": _C.get_value(name="REFERENCE_RATE__TIIE_28"),
+                           "TIIE182":  _C.get_value(name="REFERENCE_RATE__TIIE_182"),
+                           "TIIE91":  _C.get_value(name="REFERENCE_RATE__TIIE_91"),
+                           "TIIE28 EQUIV 182":  _C.get_value(name="REFERENCE_RATE__TIIE_182"),
+                           "Tasa TIIE Fondeo 1D":  _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"),
+                           "CETE_28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
+                           "CETE28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
+                           "CETE182":  _C.get_value(name="REFERENCE_RATE__CETE_182"),
                            }
 
 # =============================================================================

@@ -82,7 +82,6 @@ def _update_banxico_fixings(
     update_statistics,
     unique_identifier: str,
     id_map: Mapping[str, str],
-    instrument_label: str,
     value_to_rate: Optional[Callable[[pd.Series], pd.Series]] = None,
 ) -> pd.DataFrame:
     """
@@ -109,7 +108,7 @@ def _update_banxico_fixings(
         with a single 'rate' column (decimal). Empty if nothing to update.
     """
     # --- 0) Validate + token
-    assert unique_identifier in id_map, f"Invalid unique identifier for {instrument_label}"
+    assert unique_identifier in id_map, f"Invalid unique identifier for {unique_identifier}"
     token = os.getenv("BANXICO_TOKEN")
     if not token:
         raise RuntimeError("BANXICO_TOKEN environment variable is required for Banxico SIE access.")
@@ -133,13 +132,11 @@ def _update_banxico_fixings(
     end_date = yday.date().isoformat()
 
     # --- 2) Build SID universe + alias expansion (handles duplicate SIDs mapping to multiple aliases)
-    aliases_by_sid: Dict[str, List[str]] = {}
-    for alias, sid in id_map.items():
-        aliases_by_sid.setdefault(sid, []).append(alias)
-    sids = list(aliases_by_sid.keys())
+    banxico_alias=id_map[unique_identifier]
+    aliases_by_sid={banxico_alias: unique_identifier}
 
     # --- 3) Pull once + normalize long
-    raw = fetch_banxico_series_batched(sids, start_date=start_date, end_date=end_date, token=token)
+    raw = fetch_banxico_series_batched([banxico_alias], start_date=start_date, end_date=end_date, token=token)
     long_df = to_long_with_aliases(raw, aliases_by_sid)  # columns: date(UTC), alias, value
     if long_df.empty:
         return pd.DataFrame()
@@ -166,8 +163,6 @@ def update_tiie_fixings(update_statistics, unique_identifier: str) -> pd.DataFra
         update_statistics=update_statistics,
         unique_identifier=unique_identifier,
         id_map=TIIE_FIXING_ID_MAP,
-        instrument_label="TIIE",
-        # TIIE values arrive in percent; convert to decimal:
         value_to_rate=lambda s: s / 100.0,
     )
 
@@ -180,8 +175,6 @@ def update_cete_fixing(update_statistics, unique_identifier: str) -> pd.DataFram
         update_statistics=update_statistics,
         unique_identifier=unique_identifier,
         id_map=CETE_FIXING_ID_MAP,
-        instrument_label="CETE",
-        # CETE yields are also reported in percent; convert to decimal:
         value_to_rate=lambda s: s / 100.0,
     )
 

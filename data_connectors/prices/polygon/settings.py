@@ -1,6 +1,9 @@
 # us_treasuries/settings.py
 from typing import Dict
 
+
+UST_CMT_YIELDS_TABLE_UID="polygon_ust_cmt_usd"
+
 # --------------- Polygon base ----------------
 POLYGON_API_BASE = "https://api.polygon.io"
 POLYGON_TREASURY_YIELDS_PATH = "/fed/v1/treasury-yields"  # Economy → Treasury Yields
@@ -32,6 +35,3 @@ UST_TENOR_DAYS: Dict[str, int] = {
     "10y": 3650, "20y": 7300, "30y": 10950,
 }
 
-# --------------- Table identifiers ----------------
-UST_CMT_YIELDS_TABLE_UID = "polygon_ust_cmt_usd"            # CMT by tenor
-UST_CMT_ZERO_CURVE_UID  = "polygon_ust_cmt_zero_curve_usd"  # bootstrapped curve

@@ -18,7 +18,6 @@ import pandas as pd
 
 from data_connectors.interest_rates.registries.discount_curves import DISCOUNT_CURVE_BUILD_REGISTRY
 from data_connectors.interest_rates.registries.fixing_rates import FIXING_RATE_BUILD_REGISTRY
-from data_connectors.interest_rates.registries.constants import TIIE_28_ZERO_CURVE, M_BONOS_ZERO_OTR
 
 
 UTC = pytz.UTC

@@ -106,7 +106,7 @@ class BanxicoMXNOTR(DataNode):
     def get_table_metadata(self) -> Optional[msc.TableMetaData]:
         # Identifier + daily frequency + a concise description
         return msc.TableMetaData(
-            identifier=ON_THE_RUN_DATA_NODE_UID,
+            identifier=ON_THE_RUN_DATA_NODE_TABLE_NAME,
             data_frequency_id=msc.DataFrequency.one_d,
             description=(
                 "On-the-run CETES & BONOS (MXN) daily time series from Banxico SIE with columns: "

@@ -15,8 +15,9 @@ from .settings import (
     POLYGON_TREASURY_YIELDS_PATH,
     UST_CMT_FIELD_BY_TENOR,
     UST_TENOR_DAYS,
-    UST_CMT_YIELDS_TABLE_UID,
+UST_CMT_YIELDS_TABLE_UID
 )
+
 from .utils import PolygonClient, normalize_cmt_rows
 
 UTC = pytz.utc
@@ -97,7 +98,8 @@ class PolygonUSTCMTYields(PolygonEconomyNode):
                 "security_type": msc.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_DOMESTIC,
                 "security_type_2": msc.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_2_GOVT,
             })
-        return msc.Asset.batch_get_or_register_custom_assets(payload)
+        asset_list=msc.Asset.batch_get_or_register_custom_assets(payload)
+        return asset_list
 
     def get_asset_list(self) -> List[msc.Asset]:
         return self.build_assets()

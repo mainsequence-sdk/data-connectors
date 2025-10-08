@@ -1,6 +1,7 @@
 from typing import Dict, Tuple, Optional, Union, List
 import mainsequence.client as msc
 from mainsequence.client import Constant as _C
+
 # -----------------------------
 # Banxico series catalogs
 # -----------------------------
@@ -33,24 +34,22 @@ FONDEO_GUVBERNAMENTAL={"":"SF43774"}
 
 
 BANXICO_TARGET_RATE="BANXICO_TARGET_RATE"
-ON_THE_RUN_DATA_NODE_UID="banxico_1d_otr_mxn"
+ON_THE_RUN_DATA_NODE_TABLE_NAME="banxico_1d_otr_mxn"
+
 MONEY_MARKET_RATES={BANXICO_TARGET_RATE:"SF61745",
                     }
 
 
-
-
-
 TIIE_FIXING_ID_MAP={
-                    _C.get_value(name="TIIE_OVERNIGHT_UID"):"SF331451",
-                    _C.get_value(name="TIIE_28_UID"):"SF43783",
-                    _C.get_value(name="TIIE_91_UID"):"SF43783",
-                    _C.get_value(name="TIIE_182_UID"):"SF111916"
+                    _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"):"SF331451",
+                    _C.get_value(name="REFERENCE_RATE__TIIE_28"):"SF43783",
+                    _C.get_value(name="REFERENCE_RATE__TIIE_91"):"SF43878",
+                    _C.get_value(name="REFERENCE_RATE__TIIE_182"):"SF111916"
                      }
 
-CETE_FIXING_ID_MAP={ _C.get_value(name="CETE_28_UID"):"SF45470",
-                     _C.get_value(name="CETE_91_UID"):"SF45471",
-                     _C.get_value(name="CETE_182_UID"):"SF45472"
+CETE_FIXING_ID_MAP={ _C.get_value(name="REFERENCE_RATE__CETE_28"):"SF45470",
+                     _C.get_value(name="REFERENCE_RATE__CETE_91"):"SF45471",
+                     _C.get_value(name="REFERENCE_RATE__CETE_182"):"SF45472"
 
                     }
 
