@@ -85,14 +85,12 @@ def get_stock_assets(inlcude_etfs=True):
     if sp500_cat is None:
         sp500_cat = AssetCategory.create(
             display_name=SP500_CATEGORY_NAME,
-            source="datahub.io",
             description="Constitutens of S&P500",
             unique_identifier=unique_identifier,
         )
     if mag_7_cat is None:
         mag_7_cat = AssetCategory.create(
             display_name=MAG_7_CATEGORY_NAME,
-            source="mainsequence",
             description="Constitutens of MAG7",
             unique_identifier=MAG_7_CATEGORY_NAME.lower().replace(" ", "_"),
         )
@@ -136,7 +134,6 @@ def get_stock_assets(inlcude_etfs=True):
         if etf_cat is None:
             etf_cat = AssetCategory.create(
                 display_name=ETF_CATEGORY_NAME,
-                source="mainsequence",
                 description="Collection of ETFs",
                 unique_identifier=ETF_CATEGORY_NAME.lower().replace(" ", "_"),
             )

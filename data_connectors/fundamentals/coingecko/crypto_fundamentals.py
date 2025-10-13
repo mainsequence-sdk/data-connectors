@@ -154,7 +154,6 @@ class CoinGeckoMarketCap(DataNode):
                 if len(crypto_category) == 0:
                     crypto_category = AssetCategory.create(
                         display_name=name,
-                        source="coingecko",
                         description=f"This category contains the top {i} cryptos by market cap as of {last_date}",
                         unique_id=name.replace(" ", "_").lower(),
                     )

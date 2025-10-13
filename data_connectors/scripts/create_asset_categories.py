@@ -38,7 +38,7 @@ def create_crypto_categories():
                                                         current_snapshot__exchange_code="BNCE" #only binance
                                                         )
         spot_in_category=[a.id for a in spot_in_category]
-        msc.AssetCategory.get_or_create(display_name=category_name, source="binance/coingecko",
+        msc.AssetCategory.get_or_create(display_name=category_name,
                                         unique_identifier=category_name.lower().replace(" ", "_"),
                                         assets=spot_in_category)
 
@@ -51,7 +51,7 @@ def create_crypto_categories():
         future_in_category = [a.id for a in future_in_category]
         msc.AssetCategory.get_or_create(display_name=future_category_name,
                                         unique_identifier=future_category_name.lower().replace(" ", "_"),
-                                        source="binance/coingecko",
+
                                         assets=future_in_category)
 
 
