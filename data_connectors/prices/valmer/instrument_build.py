@@ -605,17 +605,21 @@ def build_qll_bond_from_row(
 
     if coupon_rule == "Tasa Fija":  # Fixed Rate Bond
 
-        frb=msi.FixedRateBond(face_value=face_adj,
-                              coupon_rate=row["tasacupon"]/100,
-                            issue_date=issue_date,
-                            maturity_date=maturity_date,
-                            coupon_frequency=parse_coupon_period(row.get("freccpn")),
-                            day_count=dc,
-                            calendar=calendar,
-                            business_day_convention=bdc,
-                            settlement_days=settlement_days,
-                              schedule=explicit_schedule,
-                              )
+        benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP["TIIE28"]
+
+        frb = msi.FixedRateBond(face_value=face_adj,
+                                coupon_rate=row["tasacupon"] / 100,
+                                benchmark_rate_index_name=benchmark_rate_index_name,
+
+                                issue_date=issue_date,
+                                maturity_date=maturity_date,
+                                coupon_frequency=parse_coupon_period(row.get("freccpn")),
+                                day_count=dc,
+                                calendar=calendar,
+                                business_day_convention=bdc,
+                                settlement_days=settlement_days,
+                                schedule=explicit_schedule,
+                                )
 
     else:  # floating rate bond
         floating_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["reglacupon"]]
@@ -632,7 +636,7 @@ def build_qll_bond_from_row(
             calendar=calendar,
             business_day_convention=bdc,
             settlement_days=settlement_days,
-
+            benchmark_rate_index_name=floating_rate_index_name,
             schedule=explicit_schedule,
         )
     frb.set_valuation_date( eval_date,)

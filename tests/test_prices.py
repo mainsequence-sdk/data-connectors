@@ -148,6 +148,7 @@ def test_floating_portfolio_valmer():
 
 
 
+
 def test_discount_curves():
     from data_connectors.interest_rates.nodes import (DiscountCurves,CurveConfig,
                                                       )
@@ -155,20 +156,20 @@ def test_discount_curves():
     from data_connectors.prices.banxico.settings import ON_THE_RUN_DATA_NODE_TABLE_NAME
     from data_connectors.prices.polygon.settings import UST_CMT_YIELDS_TABLE_UID
 
-    # config=CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__VALMER_TIIE_28"),
-    #                    name="Discount Curve TIIE 28 Mexder Valmer",
-    #                    )
-    # node=DiscountCurves(curve_config=config)
-    # node.run(debug_mode=True,force_update=True)
-    #
-    # config = CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__BANXICO_M_BONOS_OTR"),
-    #                      name="Discount Curve M Bonos Banxico Boostrapped",
-    # curve_points_dependecy_data_node_uid=ON_THE_RUN_DATA_NODE_TABLE_NAME
-    #                      )
-    # node = DiscountCurves(curve_config=config)
-    # node.run(debug_mode=True, force_update=True)
-    #
-    #
+    config=CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__VALMER_TIIE_28"),
+                       name="Discount Curve TIIE 28 Mexder Valmer",
+                       )
+    node=DiscountCurves(curve_config=config)
+    node.run(debug_mode=True,force_update=True)
+
+    config = CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__BANXICO_M_BONOS_OTR"),
+                         name="Discount Curve M Bonos Banxico Boostrapped",
+    curve_points_dependecy_data_node_uid=ON_THE_RUN_DATA_NODE_TABLE_NAME
+                         )
+    node = DiscountCurves(curve_config=config)
+    node.run(debug_mode=True, force_update=True)
+
+
     config = CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__UST_CMT_ZERO_CURVE_UID"),
                          name="Discount Curve UST Bootstrapped",
     curve_points_dependecy_data_node_uid=UST_CMT_YIELDS_TABLE_UID
@@ -329,20 +330,20 @@ def test_banxico_tiie_fixing():
     from mainsequence.client import Constant as _C
 
     fixing_config = FixingRateConfig(rates_config_list=[
-        RateConfig(unique_identifier=_C.get_value("TIIE_OVERNIGHT_UID"),
-                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_OVERNIGHT_UID')}"),
-        RateConfig(unique_identifier=_C.get_value("TIIE_28_UID"),
-                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_28_UID')}"),
-        RateConfig(unique_identifier=_C.get_value("TIIE_91_UID"),
-                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_91_UID')}"),
-        RateConfig(unique_identifier=_C.get_value("TIIE_182_UID"),
-                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('TIIE_182_UID')}"),
-        RateConfig(unique_identifier=_C.get_value("CETE_28_UID"),
-                   name=f"CETE 28 days {_C.get_value('CETE_28_UID')}"),
-        RateConfig(unique_identifier=_C.get_value("CETE_91_UID"),
-                   name=f"CETE 91 days {_C.get_value('CETE_91_UID')}"),
-        RateConfig(unique_identifier=_C.get_value("CETE_182_UID"),
-                   name=f"CETE 182 days {_C.get_value('CETE_182_UID')}"),
+        RateConfig(unique_identifier=_C.get_value("REFERENCE_RATE__TIIE_OVERNIGHT"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('REFERENCE_RATE__TIIE_OVERNIGHT')}"),
+        RateConfig(unique_identifier=_C.get_value("REFERENCE_RATE__TIIE_28"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('REFERENCE_RATE__TIIE_28')}"),
+        RateConfig(unique_identifier=_C.get_value("REFERENCE_RATE__TIIE_91"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('REFERENCE_RATE__TIIE_91')}"),
+        RateConfig(unique_identifier=_C.get_value("REFERENCE_RATE__TIIE_182"),
+                   name=f"Interbank Equilibrium Interest Rate (TIIE) {_C.get_value('REFERENCE_RATE__TIIE_182')}"),
+        RateConfig(unique_identifier=_C.get_value("REFERENCE_RATE__CETE_28"),
+                   name=f"CETE 28 days {_C.get_value('REFERENCE_RATE__CETE_28')}"),
+        RateConfig(unique_identifier=_C.get_value("REFERENCE_RATE__CETE_91"),
+                   name=f"CETE 91 days {_C.get_value('REFERENCE_RATE__CETE_91')}"),
+        RateConfig(unique_identifier=_C.get_value("REFERENCE_RATE__CETE_182"),
+                   name=f"CETE 182 days {_C.get_value('REFERENCE_RATE__CETE_182')}"),
 
     ]
 
@@ -383,8 +384,8 @@ def test_polygon_cmt_UST_nodes():
 # test_polygon_data_nodes()
 
 #fixed income
-# test_banxico_tiie_fixing()
+test_banxico_tiie_fixing()
 # test_banxico_mbonos()
 # test_discount_curves()
 # test_polygon_cmt_UST_nodes()
-text_fred_fixing()
+# text_fred_fixing()

@@ -384,6 +384,7 @@ class ImportValmer(DataNode):
                     icalendar, business_day_convention, settlement_days, day_count = get_instrument_conventions(row)
 
                     ql_bond=build_qll_bond_from_row(row=row,
+
                                                        calendar=icalendar, dc=day_count,
                                                        bdc=business_day_convention, settlement_days=settlement_days,
                                                        )
