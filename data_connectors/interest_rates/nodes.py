@@ -18,6 +18,7 @@ import pandas as pd
 
 from data_connectors.interest_rates.registries.discount_curves import DISCOUNT_CURVE_BUILD_REGISTRY
 from data_connectors.interest_rates.registries.fixing_rates import FIXING_RATE_BUILD_REGISTRY
+from .settings import FIXING_RATES_1D_TABLE_NAME,DISCOUNT_CURVES_TABLE_NAME
 
 
 UTC = pytz.UTC
@@ -167,7 +168,7 @@ class DiscountCurves(DataNode):
 
     def get_table_metadata(self) -> msc.TableMetaData:
         return msc.TableMetaData(
-            identifier="discount_curves",
+            identifier=DISCOUNT_CURVES_TABLE_NAME,
             data_frequency_id=msc.DataFrequency.one_d,
             description="Collection of Discount Curves"
         )
@@ -238,7 +239,7 @@ class FixingRatesNode(DataNode):
 
     def get_table_metadata(self) -> msc.TableMetaData:
         return msc.TableMetaData(
-            identifier="fixing_rates_1d",
+            identifier=FIXING_RATES_1D_TABLE_NAME,
             data_frequency_id=msc.DataFrequency.one_d,
             description=f"Daily fixing rates ",
         )
