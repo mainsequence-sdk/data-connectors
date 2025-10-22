@@ -1,5 +1,54 @@
-.ipynb_checkpoints
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# Builds / packaging
+build/
+dist/
+wheels/
+*.egg-info/
+.eggs/
+*.egg
+*.manifest
+*.spec
+SOURCES.txt
+
+# Compiled extensions
+*.so
+*.pyd
+*.dll
+
+# Test/coverage tools
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Caches
+.cache/
+
+# Env & secrets
 .env
-__pycache__
-.idea
-/.cache/
+.env.*
+!.env.example
+
+# Editors/OS

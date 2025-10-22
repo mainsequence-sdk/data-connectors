@@ -23,6 +23,7 @@ data_connectors/helpers/asset_consistency.py
 data_connectors/helpers/s3_utils.py
 data_connectors/interest_rates/__init__.py
 data_connectors/interest_rates/nodes.py
+data_connectors/interest_rates/settings.py
 data_connectors/interest_rates/registries/__init__.py
 data_connectors/interest_rates/registries/discount_curves.py
 data_connectors/interest_rates/registries/fixing_rates.py
