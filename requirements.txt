@@ -1174,9 +1174,9 @@ lxml-html-clean==0.4.2 \
     --hash=sha256:74ccfba277adcfea87a1e9294f47dd86b05d65b4da7c5b07966e3d5f3be8a505 \
     --hash=sha256:91291e7b5db95430abf461bc53440964d58e06cc468950f9e47db64976cebcb3
     # via mainsequence
-mainsequence==2.0.0 \
-    --hash=sha256:32901231e835b79ffeb9397c5b2538d932f54f601a6de354be66fed043e6ff45 \
-    --hash=sha256:d3b58f4576829eaee4662f270ab8d42f09cfc54776a85bbb32b6d4a7392742c8
+mainsequence==3.1.17 \
+    --hash=sha256:0549f10b335026e2fbb71c46a178ff21782ce5250117e11f8932af135550bbd1 \
+    --hash=sha256:81ac16c7b215943b6bd3e843df66f421ac4801659e6cdd12194097a43358d93a
     # via data-connectors
 markdown-it-py==4.0.0 \
     --hash=sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147 \

@@ -52,3 +52,4 @@ htmlcov/
 !.env.example
 
 # Editors/OS
+.idea
