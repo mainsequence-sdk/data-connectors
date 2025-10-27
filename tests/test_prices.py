@@ -384,7 +384,7 @@ def test_polygon_cmt_UST_nodes():
 # test_polygon_data_nodes()
 
 #fixed income
-test_banxico_tiie_fixing()
+# test_banxico_tiie_fixing()
 # test_banxico_mbonos()
 # test_discount_curves()
 # test_polygon_cmt_UST_nodes()
