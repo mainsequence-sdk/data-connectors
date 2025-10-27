@@ -78,7 +78,7 @@ jobs:
       type: "crontab"
       expression: "0 0 * * *"
 
-  - name: "Valmer Prices"
+  - name: "Valmer Vector Update"
     resource:
       notebook:
         path: "data_connectors/notebooks/valmer_prices.ipynb"
