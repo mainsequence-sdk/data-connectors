@@ -11,7 +11,7 @@ import io
 import requests
 import pytz
 
-from data_connectors.prices.valmer.instrument_build import build_qll_bond_from_row,normalize_column_name,get_instrument_conventions
+from src.data_connectors.prices.valmer.instrument_build import build_qll_bond_from_row,normalize_column_name,get_instrument_conventions
 
 UTC = pytz.UTC
 import json

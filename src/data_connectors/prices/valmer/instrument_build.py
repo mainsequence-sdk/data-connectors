@@ -899,7 +899,7 @@ def build_position_from_sheet(
     Build instruments from a vendor sheet and dump a 'position.json'-style file.
     Returns (Position, cfg_dict, position_json_path, df_out_csv_path).
     """
-    from data_connectors.settings import PROJECT_BUCKET_NAME
+    from src.data_connectors.settings import PROJECT_BUCKET_NAME
 
     sheet_path = str(sheet_path)
     df = pd.read_excel(sheet_path)

@@ -1,6 +1,6 @@
 from mainsequence.client import AssetTranslationRule, AssetFilter, MARKETS_CONSTANTS
 
-from data_connectors.utils import register_rules
+from src.data_connectors.utils import register_rules
 
 
 def create_asset_translation_table():

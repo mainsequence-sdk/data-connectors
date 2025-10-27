@@ -4,8 +4,8 @@ from __future__ import annotations
 from typing import Callable, Dict, Mapping
 
 # Banxico sources (MXN fixings)
-from data_connectors.prices.banxico import TIIE_FIXING_BUILD_MAP, CETE_FIXING_BUILD_MAP
-from data_connectors.prices.fred import USD_FRED_FIXING_BUILD_MAP
+from src.data_connectors.prices.banxico import TIIE_FIXING_BUILD_MAP, CETE_FIXING_BUILD_MAP
+from src.data_connectors.prices.fred import USD_FRED_FIXING_BUILD_MAP
 
 
 

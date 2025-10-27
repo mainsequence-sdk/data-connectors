@@ -3,9 +3,9 @@
 from typing import List, Dict
 from pydantic import BaseModel
 
-from data_connectors.websockets.consumers import DataWriter
-from data_connectors.websockets.bar import BarAggregator
-from data_connectors.websockets.producers import ProducerBase
+from src.data_connectors.websockets.consumers import DataWriter
+from src.data_connectors.websockets.bar import BarAggregator
+from src.data_connectors.websockets.producers import ProducerBase
 from concurrent.futures import ProcessPoolExecutor
 import queue
 import asyncio

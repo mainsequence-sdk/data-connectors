@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data_connectors"
-version = "2.0.0"
+version = "3.0.0"
 authors = [{ name = "Main Sequence GmbH" }]
 requires-python = ">=3.10.0"
 
@@ -35,7 +35,11 @@ dependencies = [
   "minio",
 ]
 
-# Mirror setuptools.find_packages(include=['data_connectors','data_connectors.*'])
-# so discovery matches your previous setup.py behavior.
+[tool.setuptools]
+# Map project root -> src/ (src layout)
+package-dir = {"" = "src"}
+
+# Mirror find_packages(include=['data_connectors','data_connectors.*'])
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["data_connectors", "data_connectors.*"]

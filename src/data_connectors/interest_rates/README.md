@@ -168,7 +168,7 @@ They decouple **source‑specific logic** (per provider) from **platform integra
    ```
 4. **Instantiate the node**:
    ```python
-   from data_connectors.interest_rates.nodes import DiscountCurves, CurveConfig
+   from src.data_connectors.interest_rates.nodes import DiscountCurves, CurveConfig
 
    cfg = CurveConfig(
        unique_identifier="ZERO_CURVE__MYPROVIDER_XYZ",   # use your registry key string
@@ -207,7 +207,7 @@ They decouple **source‑specific logic** (per provider) from **platform integra
    ```
 4. **Instantiate the node**:
    ```python
-   from data_connectors.interest_rates.nodes import FixingRatesNode, FixingRateConfig, RateConfig
+   from src.data_connectors.interest_rates.nodes import FixingRatesNode, FixingRateConfig, RateConfig
 
    rates_cfg = FixingRateConfig(rates_config_list=[
        RateConfig(unique_identifier="MY_FIXING_UID", name="My Fixing (decimal)"),
@@ -218,7 +218,7 @@ They decouple **source‑specific logic** (per provider) from **platform integra
 ### 3) Decode a stored **discount curve**
 
 ```python
-from data_connectors.interest_rates.nodes import decompress_string_to_curve
+from src.data_connectors.interest_rates.nodes import decompress_string_to_curve
 
 # Suppose df is the (MultiIndex) DataFrame read from the discount curves table
 # and you want the curve for a specific (time_index, unique_identifier):

@@ -1,9 +1,9 @@
 # Your imports, unchanged as requested.
 from mainsequence.client import DynamicTableMetaData
 
-from data_connectors.websockets.producers.alpaca import AlpacaTradesProducer
-from data_connectors.websockets.producers.binance import BinanceTradesProducer
-from data_connectors.websockets.time_series import BarConfiguration,LiveBarsTimeSeries
+from src.data_connectors.websockets.producers.alpaca import AlpacaTradesProducer
+from src.data_connectors.websockets.producers.binance import BinanceTradesProducer
+from src.data_connectors.websockets.time_series import BarConfiguration,LiveBarsTimeSeries
 
 
 import logging
@@ -83,7 +83,7 @@ def start_crawler(price_source:str,config: dict):
     ts.verify_and_build_remote_objects()
     #set table metadata
     if ts.metadata.sourcetableconfiguration is None:
-        from data_connectors.websockets.bar import Bar
+        from src.data_connectors.websockets.bar import Bar
         dtypes=Bar.get_dtypes()
 
         index_names=["time_index","unique_identifier"]

@@ -224,7 +224,7 @@ def _infer_epoch_per_second(times_arr: np.ndarray) -> int:
 
 _EPOCH_UNIT_STR = {1:'s', 1_000:'ms', 1_000_000:'us', 1_000_000_000:'ns'}
 
-from data_connectors.helpers.s3_utils import (is_s3_uri, cached_s3_fetch, S3Config,
+from src.data_connectors.helpers.s3_utils import (is_s3_uri, cached_s3_fetch, S3Config,
                                               upload_file_to_s3,delete_s3_object_if_exists,
                                               purge_invalid_zips_under_prefix)
 

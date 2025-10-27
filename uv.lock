@@ -1705,7 +1705,7 @@ wheels = [
 
 [[package]]
 name = "mainsequence"
-version = "3.1.17"
+version = "3.1.26"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cloudpickle" },
@@ -1745,9 +1745,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/65/21/b9e813cec58982387c3a33f47970c16a0e7b76113c2ce8585aa380942f73/mainsequence-3.1.17.tar.gz", hash = "sha256:81ac16c7b215943b6bd3e843df66f421ac4801659e6cdd12194097a43358d93a", size = 896632, upload-time = "2025-10-22T09:57:50.591Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/b3/16496d9003297054931840f7dc578303e42c460943c89ddcc146bac02b80/mainsequence-3.1.26.tar.gz", hash = "sha256:3d286a774b472eb7a209eb2b4c2fe187e8ee517e23d8462894a68af22b29f7bf", size = 894378, upload-time = "2025-10-25T17:19:21.27Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/47/749b63ef9afbd90cb1003722390ca4e14057a3c53c9886e98bab7101654d/mainsequence-3.1.17-py3-none-any.whl", hash = "sha256:0549f10b335026e2fbb71c46a178ff21782ce5250117e11f8932af135550bbd1", size = 945712, upload-time = "2025-10-22T09:57:48.716Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/7d/b700929932db77077b3326d3239ff4fda7c4b75296853b7524cfa345212c/mainsequence-3.1.26-py3-none-any.whl", hash = "sha256:5be572ea3e67a21c6d047bbe0ff74d16f2cf50923bfff6ea50f4c024d324e450", size = 942631, upload-time = "2025-10-25T17:19:18.958Z" },
 ]
 
 [[package]]

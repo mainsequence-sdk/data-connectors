@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from typing import List, Optional
 from tqdm import tqdm
-from data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials,get_latest_market_cap_coingecko
+from src.data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials,get_latest_market_cap_coingecko
 import json
-from data_connectors.utils import NAME_CRYPTO_MARKET_CAP
+from src.data_connectors.utils import NAME_CRYPTO_MARKET_CAP
 import mainsequence.client as ms_client
 
 class CoinGeckoMarketCap(DataNode):

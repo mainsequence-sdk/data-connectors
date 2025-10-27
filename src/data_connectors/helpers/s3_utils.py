@@ -425,11 +425,11 @@ from minio import Minio
 from minio.error import S3Error
 
 # --- Your existing helpers ---
-from data_connectors.helpers.s3_utils import is_s3_uri, S3Config
+from src.data_connectors.helpers.s3_utils import is_s3_uri, S3Config
 
 # If you already have parse_s3_uri in s3_utils, import it; otherwise, fallback below.
 try:
-    from data_connectors.helpers.s3_utils import parse_s3_uri  # (bucket, key/prefix)
+    from src.data_connectors.helpers.s3_utils import parse_s3_uri  # (bucket, key/prefix)
 except Exception:
     from urllib.parse import urlparse
     def parse_s3_uri(uri: str):
@@ -440,7 +440,7 @@ except Exception:
 
 # Import the delete helper you provided (adjust path as needed).
 # If you placed it in s3_utils next to upload_file_to_s3, import from there.
-from data_connectors.helpers.s3_utils import delete_s3_object_if_exists  # <-- adjust if different
+from src.data_connectors.helpers.s3_utils import delete_s3_object_if_exists  # <-- adjust if different
 
 
 # ------------- Zip helpers -------------

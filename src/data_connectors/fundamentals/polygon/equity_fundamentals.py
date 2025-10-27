@@ -6,10 +6,10 @@ from datetime import datetime, timedelta
 import pytz
 from typing import List, Optional
 from tqdm import tqdm
-from data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials
+from src.data_connectors.fundamentals.utils import approximate_market_cap_with_polygon,get_polygon_financials
 import json
 import json
-from data_connectors.utils import NAME_ALPACA_MARKET_CAP, get_stock_assets
+from src.data_connectors.utils import NAME_ALPACA_MARKET_CAP, get_stock_assets
 from mainsequence.client import  DataFrequency, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
 import mainsequence.client as ms_client
 

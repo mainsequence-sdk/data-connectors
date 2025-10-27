@@ -16,8 +16,8 @@ import datetime
 import pandas as pd
 
 
-from data_connectors.interest_rates.registries.discount_curves import DISCOUNT_CURVE_BUILD_REGISTRY
-from data_connectors.interest_rates.registries.fixing_rates import FIXING_RATE_BUILD_REGISTRY
+from src.data_connectors.interest_rates.registries.discount_curves import DISCOUNT_CURVE_BUILD_REGISTRY
+from src.data_connectors.interest_rates.registries.fixing_rates import FIXING_RATE_BUILD_REGISTRY
 from .settings import FIXING_RATES_1D_TABLE_NAME,DISCOUNT_CURVES_TABLE_NAME
 
 

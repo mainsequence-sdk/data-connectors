@@ -185,7 +185,7 @@ Because **QuantLib** cashflow generation depends on schedule **and** day count, 
 ```python
 import pandas as pd
 import QuantLib as ql
-from data_connectors.prices.valmer.instrument_build import (
+from src.data_connectors.prices.valmer.instrument_build import (
     compute_sheet_schedule_force_match,
     build_qll_bond_from_row,
     get_instrument_conventions,
@@ -221,7 +221,7 @@ print("Sheet CUPONES X COBRAR =", row["cuponesxcobrar"])
 ### B) Price‑check a filtered sheet subset
 
 ```python
-from data_connectors.prices.valmer.instrument_build import run_price_check, normalize_column_name
+from src.data_connectors.prices.valmer.instrument_build import run_price_check, normalize_column_name
 import pandas as pd
 
 df = pd.read_excel("vendor_sheet.xlsx")
@@ -241,7 +241,7 @@ print(df_out.head())
 ### C) Ingest artifacts and emit time series (**DataNode**)
 
 ```python
-from data_connectors.prices.valmer.time_series import ImportValmer
+from src.data_connectors.prices.valmer.time_series import ImportValmer
 node = ImportValmer(bucket_name="ValmerRawArtifacts")
 df = node._get_artifact_data()     # load & normalize source rows
 assets = node.get_asset_list()     # register assets + attach instrument details
@@ -252,7 +252,7 @@ print(out.head())
 ### D) Build & store the **TIIE‑28** zero curve (compressed)
 
 ```python
-from data_connectors.prices.valmer.time_series import MexDerTIIE28Zero
+from src.data_connectors.prices.valmer.time_series import MexDerTIIE28Zero
 zc = MexDerTIIE28Zero()
 curve_df = zc.update()  # MultiIndex with column "curve" (base64(gzip(JSON)))
 print(curve_df.head())

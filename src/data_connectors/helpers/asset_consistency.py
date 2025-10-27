@@ -435,7 +435,7 @@ def analyze_missing_data(
 def analyze_missing_data_in_table(data_node: DataNode,start_date: dt.datetime, frequency,
                                   chunk_size:dt.timedelta=dt.timedelta(days=90),
                                   num_workers=1,use_minimals=True) -> MissingnessResult:
-    from data_connectors.helpers.asset_consistency import analyze_missing_data
+    from src.data_connectors.helpers.asset_consistency import analyze_missing_data
 
     update_stats = data_node.local_persist_manager.metadata.sourcetableconfiguration.get_data_updates()
     update_stats._initial_fallback_date = data_node.OFFSET_START
