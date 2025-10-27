@@ -789,10 +789,14 @@ def run_price_check(
         icalendar, business_day_convention, settlement_days, day_count=get_instrument_conventions(row)
 
         # Build bond (explicit schedule)
-        bond = build_qll_bond_from_row(
-            row,
-            calendar=icalendar, dc=day_count, bdc=business_day_convention, settlement_days=settlement_days,
-        )
+        try:
+            bond = build_qll_bond_from_row(
+                row,
+                calendar=icalendar, dc=day_count, bdc=business_day_convention, settlement_days=settlement_days,
+            )
+        except Exception as e:
+            print(row)
+            raise e
 
         # Model analytics (force construction)
         try:
