@@ -35,6 +35,7 @@ SUBYACENTE_TO_INDEX_MAP = {"TIIE28": _C.get_value(name="REFERENCE_RATE__TIIE_28"
                            "CETE_28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
                            "CETE28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
                            "CETE182":  _C.get_value(name="REFERENCE_RATE__CETE_182"),
+                           "Bonos M Bruta(Yield)": _C.get_value(name="REFERENCE_RATE__CETE_28"),
                            }
 
 # =============================================================================
@@ -622,7 +623,10 @@ def build_qll_bond_from_row(
                                 )
 
     else:  # floating rate bond
-        floating_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["reglacupon"]]
+        try:
+            floating_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["reglacupon"]]
+        except KeyError as e:
+            raise e
 
         # --- your model (ensure it supports 'schedule=...') ---
         frb = msi.FloatingRateBond(

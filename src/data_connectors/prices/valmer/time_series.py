@@ -388,6 +388,7 @@ class ImportValmer(DataNode):
                                                        calendar=icalendar, dc=day_count,
                                                        bdc=business_day_convention, settlement_days=settlement_days,
                                                        )
+
                     instrument_pricing_detail_map[identifier]={"instrument":ql_bond,
                                                                "pricing_details_date":row["fecha"]
                                                                }
