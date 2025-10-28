@@ -8,16 +8,16 @@ from src.data_connectors.prices.polygon.data_nodes import PolygonUSTCMTYields
 def main():
 
 
-    #update dependencies to gurantee update
-    import os
 
-    ts = BanxicoMXNOTR()
-    ts.run(debug_mode=True, force_update=True)
-
-
-
-    data_node = PolygonUSTCMTYields()
-    data_node.run(debug_mode=True, force_update=True)
+    # ts = BanxicoMXNOTR()
+    # ts.run(debug_mode=True, force_update=True)
+    #
+    #
+    # try:
+    #     data_node = PolygonUSTCMTYields()
+    #     data_node.run(debug_mode=True, force_update=True)
+    # except Exception as e:
+    #     data_node.logger.exception(e)
 
 
     configs = [

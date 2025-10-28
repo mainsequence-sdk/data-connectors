@@ -18,7 +18,7 @@ import pandas as pd
 
 from src.data_connectors.interest_rates.registries.discount_curves import DISCOUNT_CURVE_BUILD_REGISTRY
 from src.data_connectors.interest_rates.registries.fixing_rates import FIXING_RATE_BUILD_REGISTRY
-from .settings import FIXING_RATES_1D_TABLE_NAME,DISCOUNT_CURVES_TABLE_NAME
+from mainsequence.client import Constant as _C
 
 
 UTC = pytz.UTC
@@ -152,7 +152,8 @@ class DiscountCurves(DataNode):
                                            curve_unique_identifier=self.curve_config.unique_identifier,
                                                                               base_node_curve_points=self.base_node_curve_points,
                                            )
-
+        if df.empty:
+            return pd.DataFrame()
         #    Apply the new compression and encoding function to the 'curve' column.
         df["curve"] = df["curve"].apply(compress_curve_to_string)
 
@@ -168,7 +169,7 @@ class DiscountCurves(DataNode):
 
     def get_table_metadata(self) -> msc.TableMetaData:
         return msc.TableMetaData(
-            identifier=DISCOUNT_CURVES_TABLE_NAME,
+            identifier=_C.get_value(name="DISCOUNT_CURVES_TABLE"),
             data_frequency_id=msc.DataFrequency.one_d,
             description="Collection of Discount Curves"
         )
@@ -239,7 +240,7 @@ class FixingRatesNode(DataNode):
 
     def get_table_metadata(self) -> msc.TableMetaData:
         return msc.TableMetaData(
-            identifier=FIXING_RATES_1D_TABLE_NAME,
+            identifier=_C.get_value("FIXING_RATES_1D_TABLE_NAME"),
             data_frequency_id=msc.DataFrequency.one_d,
             description=f"Daily fixing rates ",
         )
