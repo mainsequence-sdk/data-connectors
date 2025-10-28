@@ -24,7 +24,7 @@ class TestTimeSerie(DataNode):
         return full_data
 
 def test_valmer_prices():
-    from data_connectors.prices.valmer.time_series import ImportValmer
+    from src.data_connectors.prices.valmer.time_series import ImportValmer
     BUCKET_NAME = "Vector de precios"
 
 
@@ -39,7 +39,7 @@ def test_valmer_prices():
         )
 
 def test_valmer_vector_analytico_pricing():
-    from data_connectors.prices.valmer.instrument_build import build_position_from_sheet
+    from src.data_connectors.prices.valmer.instrument_build import build_position_from_sheet
     import os
     sheet_path=os.environ["VECTOR_ANALYTICO_PATH"]
     build_position_from_sheet(sheet_path=sheet_path)
@@ -150,11 +150,11 @@ def test_floating_portfolio_valmer():
 
 
 def test_discount_curves():
-    from data_connectors.interest_rates.nodes import (DiscountCurves,CurveConfig,
+    from src.data_connectors.interest_rates.nodes import (DiscountCurves,CurveConfig,
                                                       )
     from mainsequence.client import Constant as _C
-    from data_connectors.prices.banxico.settings import ON_THE_RUN_DATA_NODE_TABLE_NAME
-    from data_connectors.prices.polygon.settings import UST_CMT_YIELDS_TABLE_UID
+    from src.data_connectors.prices.banxico.settings import ON_THE_RUN_DATA_NODE_TABLE_NAME
+    from src.data_connectors.prices.polygon.settings import UST_CMT_YIELDS_TABLE_UID
 
     config=CurveConfig(unique_identifier=_C.get_value("ZERO_CURVE__VALMER_TIIE_28"),
                        name="Discount Curve TIIE 28 Mexder Valmer",
@@ -180,7 +180,7 @@ def test_discount_curves():
 
 
 def test_binance_bars_from_trades(bar_type="time"):
-    from data_connectors.prices.binance.time_series import BinanceBarsFromTrades,TimeBarConfig,ImbalanceBarConfig
+    from src.data_connectors.prices.binance.time_series import BinanceBarsFromTrades,TimeBarConfig,ImbalanceBarConfig
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
 
     future_assets = AssetFutureUSDM.filter(ticker__in=["BTC-USDT", "ETH-USDT", "1000SHIB-USDT"])
@@ -193,7 +193,7 @@ def test_binance_bars_from_trades(bar_type="time"):
     ts.run(debug_mode=True,force_update=True)
 
 def test_binance_daily_bars():
-    from data_connectors.prices.binance.time_series import BinanceHistoricalBars,TimeBarConfig
+    from src.data_connectors.prices.binance.time_series import BinanceHistoricalBars,TimeBarConfig
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
     future_assets = AssetFutureUSDM.filter(ticker__in=["BTC-USDT", "ETHU-SDT", "1000SHIB-USDT"])
     spot_assets = AssetCurrencyPair.filter(ticker__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
@@ -208,8 +208,8 @@ def test_binance_daily_bars():
 
 
 def test_alpaca_bars():
-    from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
-    from data_connectors.helpers import update_calendar_holes
+    from src.data_connectors.prices.alpaca.time_series import AlpacaEquityBars
+    from src.data_connectors.helpers import update_calendar_holes
     from mainsequence.client import  Asset
     ts = AlpacaEquityBars( asset_list=None,frequency_id="1d", adjustment="all")
     update_calendar_holes(data_node=ts,start_date=ts.OFFSET_START,frequency="1d")
@@ -218,7 +218,7 @@ def test_alpaca_bars():
            force_update=True)
 
 def test_alpaca_bars_small():
-    from data_connectors.prices.alpaca.time_series import AlpacaEquityBars
+    from src.data_connectors.prices.alpaca.time_series import AlpacaEquityBars
     from mainsequence.client import AssetCategory
     asset_cat = AssetCategory.get(unique_identifier="magnificent_7")
     assets = asset_cat.get_assets()[:2]
@@ -226,7 +226,7 @@ def test_alpaca_bars_small():
     ts.run(debug_mode=True, force_update=True)
 
 def test_databento_bars():
-    from data_connectors.prices.databento.time_series import DatabentoHistoricalBars
+    from src.data_connectors.prices.databento.time_series import DatabentoHistoricalBars
     ts = DatabentoHistoricalBars(
         asset_list=None,
         frequency_id="1d",
@@ -236,7 +236,7 @@ def test_databento_bars():
 
 
 def test_databento_bars_small():
-    from data_connectors.prices.databento.time_series import DatabentoHistoricalBars
+    from src.data_connectors.prices.databento.time_series import DatabentoHistoricalBars
     from mainsequence.client import AssetCategory
     asset_cat = AssetCategory.get(unique_identifier="magnificent_7")
     assets = asset_cat.get_assets()  # [:2]
@@ -248,7 +248,7 @@ def test_databento_bars_small():
     ts.run(debug_mode=True, force_update=True)
 
 def test_databento_market_cap_small():
-    from data_connectors.fundamentals.databento.market_cap import DatabentoMarketCap
+    from src.data_connectors.fundamentals.databento.market_cap import DatabentoMarketCap
     from mainsequence.client import AssetCategory
 
     asset_cat = AssetCategory.get(unique_identifier="magnificent_7")
@@ -265,7 +265,7 @@ def test_databento_market_cap_small():
     ts.run(debug_mode=True, force_update=True)
 
 def test_api_time_series():
-    from data_connectors.prices.binance.time_series import BinanceBarsFromTrades
+    from src.data_connectors.prices.binance.time_series import BinanceBarsFromTrades
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
 
     future_assets = AssetFutureUSDM.filter(ticker__in=["BTC-USDT", "ETH-USDT", "1000SHIB-USDT"])
@@ -277,13 +277,13 @@ def test_api_time_series():
     new_ts.run_in_debug_scheduler()
 
 def test_equity_market_cap():
-    from data_connectors.fundamentals.polygon.equity_fundamentals import PolygonDailyMarketCap
+    from src.data_connectors.fundamentals.polygon.equity_fundamentals import PolygonDailyMarketCap
 
     ts = PolygonDailyMarketCap(asset_list=None)
     ts.run(debug_mode=True, force_update=True)
 
 def test_crypto_market_cap():
-    from data_connectors.fundamentals.coingecko.crypto_fundamentals import CoinGeckoMarketCap
+    from src.data_connectors.fundamentals.coingecko.crypto_fundamentals import CoinGeckoMarketCap
     from mainsequence.client import AssetFutureUSDM, AssetCurrencyPair
 
     spot_assets = AssetCurrencyPair.filter(ticker__in=["BTC-USDT", "ETH-USDT", "SHIB-USDT"])
@@ -292,19 +292,19 @@ def test_crypto_market_cap():
     ts.run(debug_mode=True, force_update=True)
 
 def test_equity_fundamentals():
-    from data_connectors.fundamentals.polygon.equity_fundamentals import PolygonQFundamentals
+    from src.data_connectors.fundamentals.polygon.equity_fundamentals import PolygonQFundamentals
     asset_list=ms_client.Asset.filter(ticker__in=["AIG","OXY"])
     ts = PolygonQFundamentals(asset_list=asset_list)
     ts.run(debug_mode=True, force_update=True)
 
 def test_banxico_mbonos():
-    from data_connectors.prices.banxico.data_nodes import BanxicoMXNOTR
+    from src.data_connectors.prices.banxico.data_nodes import BanxicoMXNOTR
     import os
 
     ts=BanxicoMXNOTR()
     ts.run(debug_mode=True, force_update=True)
 def text_fred_fixing():
-    from data_connectors.interest_rates.nodes import FixingRatesNode, FixingRateConfig, RateConfig
+    from src.data_connectors.interest_rates.nodes import FixingRatesNode, FixingRateConfig, RateConfig
     from mainsequence.client import Constant as _C
 
     USD_SOFR = _C.get_value(name="REFERENCE_RATE__USD_SOFR")
@@ -326,7 +326,7 @@ def text_fred_fixing():
 
 
 def test_banxico_tiie_fixing():
-    from data_connectors.interest_rates.nodes import FixingRatesNode,FixingRateConfig,RateConfig
+    from src.data_connectors.interest_rates.nodes import FixingRatesNode,FixingRateConfig,RateConfig
     from mainsequence.client import Constant as _C
 
     fixing_config = FixingRateConfig(rates_config_list=[
@@ -353,7 +353,7 @@ def test_banxico_tiie_fixing():
     ts.run(debug_mode=True, force_update=True)
 
 def test_polygon_cmt_UST_nodes():
-    from data_connectors.prices.polygon.data_nodes import PolygonUSTCMTYields
+    from src.data_connectors.prices.polygon.data_nodes import PolygonUSTCMTYields
 
     data_node=PolygonUSTCMTYields()
     data_node.run(debug_mode=True, force_update=True)
