@@ -9,15 +9,15 @@ def main():
 
 
 
-    # ts = BanxicoMXNOTR()
-    # ts.run(debug_mode=True, force_update=True)
-    #
-    #
-    # try:
-    #     data_node = PolygonUSTCMTYields()
-    #     data_node.run(debug_mode=True, force_update=True)
-    # except Exception as e:
-    #     data_node.logger.exception(e)
+    ts = BanxicoMXNOTR()
+    ts.run(debug_mode=True, force_update=True)
+
+
+    try:
+        data_node = PolygonUSTCMTYields()
+        data_node.run(debug_mode=True, force_update=True)
+    except Exception as e:
+        data_node.logger.exception(e)
 
 
     configs = [
