@@ -36,6 +36,7 @@ def boostrap_mbono_curve(update_statistics, curve_unique_identifier: str, base_n
         great_or_equal=True
     )
 
+
     if nodes_data_df.empty:
         # Return empty frame with the expected schema
         return pd.DataFrame()
@@ -44,6 +45,10 @@ def boostrap_mbono_curve(update_statistics, curve_unique_identifier: str, base_n
 
     # Bootstrap per time_index
     for time_index, curve_df in nodes_data_df.groupby("time_index"):
+
+        if curve_df.shape[0] < 5:
+            continue
+
         curve_df = curve_df.copy()
         # robust numeric casting
         curve_df["tenor_days"] = pd.to_numeric(curve_df["days_to_maturity"], errors="coerce")
@@ -59,7 +64,8 @@ def boostrap_mbono_curve(update_statistics, curve_unique_identifier: str, base_n
 
         zero_df.insert(0, "time_index", time_index)
         results.append(zero_df)
-
+    if len(results)==0:
+        return pd.DataFrame()
     final_df = pd.concat(results, ignore_index=True)
     final_df["unique_identifier"]=curve_unique_identifier
 
