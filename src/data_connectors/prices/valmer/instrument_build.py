@@ -36,8 +36,8 @@ SUBYACENTE_TO_INDEX_MAP = {"TIIE28": _C.get_value(name="REFERENCE_RATE__TIIE_28"
                            "CETE28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
                            "CETE182":  _C.get_value(name="REFERENCE_RATE__CETE_182"),
                            "Bonos M Bruta(Yield)": _C.get_value(name="REFERENCE_RATE__CETE_28"),
-                           "Fondeo Bancario": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT_BONDES"),
-                           "Tasa TIIE Fondeo 1D": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT_BONDES"),
+                           "Fondeo Bancario": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"),
+                           "Tasa TIIE Fondeo 1D": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"),
                            }
 
 # =============================================================================
