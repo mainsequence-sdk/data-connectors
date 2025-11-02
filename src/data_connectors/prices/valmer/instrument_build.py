@@ -36,6 +36,8 @@ SUBYACENTE_TO_INDEX_MAP = {"TIIE28": _C.get_value(name="REFERENCE_RATE__TIIE_28"
                            "CETE28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
                            "CETE182":  _C.get_value(name="REFERENCE_RATE__CETE_182"),
                            "Bonos M Bruta(Yield)": _C.get_value(name="REFERENCE_RATE__CETE_28"),
+                           "Fondeo Bancario": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT_BONDES"),
+                           "Tasa TIIE Fondeo 1D": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT_BONDES"),
                            }
 
 # =============================================================================
@@ -585,6 +587,7 @@ def build_qll_bond_from_row(
     spread_decimal = (raw_spread / 100.0) if SPREAD_IS_PERCENT else raw_spread
 
     coupon_rule=row["reglacupon"]
+    emisora=row["emisora"]
 
     # --- global QL settings ---
     ql.Settings.instance().evaluationDate = qld(eval_date)
@@ -594,19 +597,30 @@ def build_qll_bond_from_row(
 
 
     # --- schedule that forces remaining coupons to match the sheet ---
-    explicit_schedule = compute_sheet_schedule_force_match(
-        row,
-        calendar=calendar,
-        bdc=bdc,
-        default_freq_days=parse_coupon_period(row.get("freccpn")),
-        settlement_days=settlement_days,  # ← add this
-        count_from_settlement=COUNT_FROM_SETTLEMENT,  # ← and this (keeps your toggle)
-        include_boundary_for_count=True,  # ← ven
-    )
+    if coupon_rule !=0:
+        explicit_schedule = compute_sheet_schedule_force_match(
+            row,
+            calendar=calendar,
+            bdc=bdc,
+            default_freq_days=parse_coupon_period(row.get("freccpn")),
+            settlement_days=settlement_days,  # ← add this
+            count_from_settlement=COUNT_FROM_SETTLEMENT,  # ← and this (keeps your toggle)
+            include_boundary_for_count=True,  # ← ven
+        )
+    if coupon_rule ==0:
+        benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP["CETE_28"]
+        frb = msi.ZeroCouponBond(face_value=face_adj,
+                                benchmark_rate_index_name=benchmark_rate_index_name,
+                                issue_date=issue_date,
+                                maturity_date=maturity_date,
+                                day_count=dc,
+                                calendar=calendar,
+                                business_day_convention=bdc,
+                                settlement_days=settlement_days,
+                                )
+    elif coupon_rule == "Tasa Fija":  # Fixed Rate Bond
 
-    if coupon_rule == "Tasa Fija":  # Fixed Rate Bond
-
-        benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP["TIIE28"]
+        benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["subyacente"]]
 
         frb = msi.FixedRateBond(face_value=face_adj,
                                 coupon_rate=row["tasacupon"] / 100,
@@ -748,12 +762,13 @@ def get_instrument_conventions(
     """
     currency = row["monedaemision"]
     subyacente = row["subyacente"]
-
+    emisora= row["emisora"]
     if currency == "MPS":  # Mexican Peso
         calendar = ql.Mexico(ql.Mexico.BMV)
 
+        is_bondes= emisora in ["BONDESD","BONDESF","BONDESG"]
         # Check for standard Mexican money market and short-term instruments
-        if any(keyword in subyacente for keyword in ["Bonos M", "CETE"]):
+        if any(keyword in subyacente for keyword in ["Bonos M", "CETE","Cetes"]) or is_bondes:
             business_day_convention = ql.Following
             settlement_days = 1  # T+1 is standard for these
             day_count = ql.Actual360()
@@ -896,6 +911,241 @@ def normalize_column_name(col_name: str) -> str:
     # Replace newlines and then remove all non-alphanumeric characters
     cleaned_name = str(col_name).replace('\n', ' ')
     return re.sub(r'[^a-z0-9]', '', cleaned_name.lower())
+
+
+def update_pricing_details(self, force_update: bool = False):
+    """
+    Using only the latest-dated artifact(s), update instrument pricing details on existing assets
+    via `add_instrument_pricing_details_from_ms_instrument`.
+
+    Behavior:
+        1) Reads artifacts like `_get_artifact_data`, but only keeps the one(s) whose date
+           in the file name is the most recent (YYYY-MM-DD in the artifact name).
+        2) Filters assets with the same conditions used in `get_asset_list`
+           (TIIE/CETE/Bonos M (MPS), etc.) and **only** calls
+           `add_instrument_pricing_details_from_ms_instrument` for them.
+        3) If `force_update=True`, ignores the "already has pricing details" checks.
+
+    Returns:
+        list of msc.Asset that were successfully updated.
+    """
+    import os
+    import re
+    from pathlib import Path
+    import mainsequence.client as msc
+    # -----------------------
+    # 1) Load only latest-dated artifact(s)
+    # -----------------------
+    def _parse_date_from_name(name: str):
+        m = re.search(r"(\d{4}-\d{2}-\d{2})", name)
+        return pd.to_datetime(m.group(1), utc=True) if m else pd.NaT
+
+    debug_artifact_path = os.environ.get("DEBUG_ARTIFACT_PATH", None)
+    frames = []
+
+    if debug_artifact_path:
+        base = Path(debug_artifact_path)
+        candidate_paths = sorted(base.rglob("*.xls*"))
+
+        dated = [(p, _parse_date_from_name(p.name)) for p in candidate_paths]
+        dated = [(p, d) for p, d in dated if pd.notna(d)]
+        if dated:
+            max_date = max(d for _, d in dated)
+            latest_objs = [p for p, d in dated if d == max_date]
+            self.logger.info(f"Latest artifact date (debug): {max_date.date()} with {len(latest_objs)} file(s).")
+        else:
+            latest_objs = candidate_paths[-1:]  # fallback by name
+            if latest_objs:
+                self.logger.warning("No parseable dates in debug file names; falling back to last file by name order.")
+
+        for p in latest_objs:
+            df = pd.read_excel(p, engine=("xlrd" if p.suffix.lower() == ".xls" else "openpyxl"))
+            if df is None or df.empty:
+                continue
+            # Normalize & build unique identifier (same as _get_artifact_data)
+            df.columns = [normalize_column_name(col) for col in df.columns]
+            required_cols = {"tipovalor", "emisora", "serie"}
+            if not required_cols.issubset(df.columns):
+                self.logger.warning(f"Skipping unique_identifier creation for {p.name} due to missing columns.")
+                continue
+            df["unique_identifier"] = (
+                df["tipovalor"].astype("string")
+                .str.cat(df["emisora"].astype("string"), sep="_")
+                .str.cat(df["serie"].astype("string"), sep="_")
+            )
+            frames.append(df)
+    else:
+        artifacts = msc.Artifact.filter(bucket__name=self.bucket_name)
+        if not artifacts:
+            self.logger.info(f"No artifacts in bucket '{self.bucket_name}'.")
+            return []
+
+        dated = [(a, _parse_date_from_name(a.name)) for a in artifacts]
+        dated = [(a, d) for a, d in dated if pd.notna(d)]
+        if dated:
+            max_date = max(d for _, d in dated)
+            latest_objs = [a for a, d in dated if d == max_date]
+            self.logger.info(f"Latest artifact date: {max_date.date()} with {len(latest_objs)} artifact(s).")
+        else:
+            latest_objs = sorted(artifacts, key=lambda a: a.name)[-1:]  # fallback by name
+            if latest_objs:
+                self.logger.warning("No parseable dates in artifact names; falling back to last by name order.")
+
+        if not latest_objs:
+            self.logger.info("No latest artifacts to process.")
+            return []
+
+        for artifact in latest_objs:
+            name_l = artifact.name.lower()
+            content = artifact.content
+            buf = content
+
+            df = None
+            if name_l.endswith(".xls"):
+                import xlrd  # noqa: F401
+                df = pd.read_excel(buf, engine="xlrd")
+            elif name_l.endswith(".csv"):
+                try:
+                    df = pd.read_csv(buf, encoding="latin1", engine="pyarrow")
+                except Exception:
+                    df = pd.read_csv(buf, encoding="latin1", low_memory=False)
+            else:
+                self.logger.info(f"Skipping unsupported file type: {artifact.name}")
+                continue
+
+            if df is None or df.empty:
+                continue
+
+            # Normalize & build unique identifier (same as _get_artifact_data)
+            df.columns = [normalize_column_name(col) for col in df.columns]
+            required_cols = {"tipovalor", "emisora", "serie"}
+            if not required_cols.issubset(df.columns):
+                self.logger.warning(
+                    f"Skipping unique_identifier creation for {artifact.name} due to missing columns."
+                )
+                continue
+
+            df["unique_identifier"] = (
+                df["tipovalor"].astype("string")
+                .str.cat(df["emisora"].astype("string"), sep="_")
+                .str.cat(df["serie"].astype("string"), sep="_")
+            )
+            frames.append(df)
+
+    if not frames:
+        self.logger.info("No valid data frames could be created from latest artifact(s).")
+        return []
+
+    try:
+        latest_source = pd.concat(frames, ignore_index=True, sort=False, copy=False)
+    except TypeError:
+        latest_source = pd.concat(frames, ignore_index=True, sort=False)
+
+    if latest_source.empty:
+        self.logger.info("Latest artifact data is empty.")
+        return []
+
+    # -----------------------
+    # 2) Prepare same filters/selection as in get_asset_list
+    # -----------------------
+    latest_source = latest_source[latest_source["unique_identifier"].notna()].copy()
+    latest_source["fecha"] = pd.to_datetime(latest_source["fecha"], format="%Y%m%d", utc=True)
+
+    # Keep last row per instrument by 'fecha'
+    idx = latest_source.groupby("unique_identifier")["fecha"].idxmax()
+    df_latest = latest_source.loc[idx].reset_index(drop=True)
+
+    # Same target-bond filters as get_asset_list
+    floating_tiie = df_latest[df_latest["subyacente"].astype(str).str.contains("TIIE", na=False)]
+    floating_cetes = df_latest[df_latest["subyacente"].astype(str).str.contains("CETE", na=False)]
+    cetes = df_latest[df_latest["subyacente"].astype(str).str.contains("Cete", na=False)]
+    m_bono_fixed_0 = df_latest[df_latest["subyacente"].astype(str).str.contains("Bonos M", na=False)]
+    m_bono_fixed_0 = m_bono_fixed_0[m_bono_fixed_0.monedaemision == "MPS"]
+
+    all_target_bonds = pd.concat([floating_tiie, floating_cetes, m_bono_fixed_0, cetes], axis=0, ignore_index=True)
+    if all_target_bonds.empty:
+        self.logger.info("No target bonds found in latest artifact(s).")
+        return []
+
+    # Assets to consider (existing only; this method does not register new ones)
+    unique_identifiers = all_target_bonds["unique_identifier"].unique().tolist()
+    per_page_assets = int(os.environ.get("VALMER_PER_PAGE", 5000))
+    existing_assets_list = msc.Asset.query(unique_identifier__in=unique_identifiers, per_page=per_page_assets)
+    existing_assets = {a.unique_identifier: a for a in existing_assets_list}
+
+    uids_to_update = []
+    for u in unique_identifiers:
+        asset = existing_assets.get(u)
+        if asset is None:
+            # Only perform add_instrument_pricing_details; skip if the asset doesn't exist.
+            continue
+
+        if force_update:
+            uids_to_update.append(u)
+            continue
+
+        # Apply the same checks as in get_asset_list (only if NOT forcing update)
+        target_row = all_target_bonds[all_target_bonds.unique_identifier == u]
+        if target_row.empty:
+            continue
+        target_row = target_row.iloc[0]
+
+        cpd = asset.current_pricing_detail
+        if cpd is None:
+            uids_to_update.append(u)
+            continue
+
+        instrument_dump = getattr(cpd, "instrument_dump", None)
+        if instrument_dump is None:
+            uids_to_update.append(u)
+            continue
+
+        try:
+            old_face_value = instrument_dump["instrument"].get("face_value")
+        except Exception:
+            old_face_value = None
+
+        if old_face_value is None:
+            uids_to_update.append(u)
+            continue
+
+        # Update if face value changed
+        if old_face_value != target_row.get("valornominalactualizado"):
+            uids_to_update.append(u)
+            continue
+
+    # Build instruments and perform ONLY the add_instrument_pricing_details_from_ms_instrument call
+    updated_assets = []
+    for u in uids_to_update:
+        row = all_target_bonds[all_target_bonds["unique_identifier"] == u].iloc[0]
+
+        # Skip zero-coupon (same as get_asset_list)
+        if str(row.get("reglacupon")) == "0":
+            continue
+
+        icalendar, business_day_convention, settlement_days, day_count = get_instrument_conventions(row)
+        ql_bond = build_qll_bond_from_row(
+            row=row,
+            calendar=icalendar,
+            dc=day_count,
+            bdc=business_day_convention,
+            settlement_days=settlement_days,
+        )
+
+        try:
+            existing_assets[u].add_instrument_pricing_details_from_ms_instrument(
+                instrument=ql_bond,
+                pricing_details_date=row["fecha"],
+            )
+            updated_assets.append(existing_assets[u])
+        except Exception as e:
+            self.logger.error(f"Failed to update pricing details for {u}: {e}")
+
+    self.logger.info(
+        f"Updated pricing details for {len(updated_assets)} asset(s) out of {len(uids_to_update)} candidate(s)."
+    )
+    return updated_assets
+
 
 def build_position_from_sheet(
     sheet_path: str | Path,

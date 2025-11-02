@@ -31,6 +31,11 @@ class BanxicoMXNOTR(DataNode):
     CETES_TENORS: Tuple[str, ...] = tuple(CETES_SERIES.keys())
     BONOS_TENORS: Tuple[str, ...] = tuple(BONOS_SERIES.keys())
 
+    # BONDES_182_TENORS: Tuple[str, ...] = tuple(BONDES_182_SERIES.keys())  # ("182d",)
+    BONDES_D_TENORS: Tuple[str, ...] = tuple(BONDES_D_SERIES.keys())  # ("1y","2y","3y","5y")
+    BONDES_F_TENORS: Tuple[str, ...] = tuple(BONDES_F_SERIES.keys())  # ("1y","2y","3y","5y","7y")
+    BONDES_G_TENORS: Tuple[str, ...] = tuple(BONDES_G_SERIES.keys())  # ("2y","4y","6y","8y","10y")
+
     SPANISH_TO_EN = {
         "plazo": "days_to_maturity",
         "precio_limpio": "clean_price",
@@ -52,8 +57,16 @@ class BanxicoMXNOTR(DataNode):
         cetes_tickers = [f"MCET_{t}_OTR" for t in self.CETES_TENORS]
         bonos_tickers = [f"MBONO_{t}_OTR" for t in self.BONOS_TENORS]
 
+        bondes_d_tickers = [f"BONDES_D_{t}_OTR" for t in self.BONDES_D_TENORS]
+        bondes_f_tickers = [f"BONDES_F_{t}_OTR" for t in self.BONDES_F_TENORS]
+        bondes_g_tickers = [f"BONDES_G_{t}_OTR" for t in self.BONDES_G_TENORS]
 
-        wanted = cetes_tickers + bonos_tickers +[BANXICO_TARGET_RATE]
+        wanted = (
+                cetes_tickers
+                + bonos_tickers
+                +  bondes_d_tickers + bondes_f_tickers + bondes_g_tickers
+                + [BANXICO_TARGET_RATE]
+        )
 
         assets_payload=[]
         for identifier in wanted:
@@ -109,7 +122,7 @@ class BanxicoMXNOTR(DataNode):
             identifier=ON_THE_RUN_DATA_NODE_TABLE_NAME,
             data_frequency_id=msc.DataFrequency.one_d,
             description=(
-                "On-the-run CETES & BONOS (MXN) daily time series from Banxico SIE with columns: "
+                "On-the-run CETES, BONOS & BONDES (182/D/F/G) daily time series from Banxico SIE with columns: "
                 "days_to_maturity, clean_price, dirty_price, current_coupon."
             ),
         )
@@ -141,19 +154,18 @@ class BanxicoMXNOTR(DataNode):
         # --- 2) Build the series universe: CETES + BONOS (map to EN metric names)
         metric_by_sid: Dict[str, str] = {}
 
-        # CETES: include 3 core metrics; add current_coupon if available in mapping
-        for t, m in CETES_SERIES.items():
-            for sk in ("plazo", "precio_limpio", "precio_sucio", "cupon_vigente"):
-                sid = m.get(sk)
-                if sid:
-                    metric_by_sid[sid] = self.SPANISH_TO_EN[sk]
+        def add_family(series_map: Dict[str, Dict[str, str]]):
+            for _tenor, m in series_map.items():
+                for sk, sid in m.items():
+                    en = self.SPANISH_TO_EN.get(sk)
+                    if en and sid:
+                        metric_by_sid[sid] = en
 
-        # BONOS: all four metrics
-        for t, m in BONOS_SERIES.items():
-            for sk, sid in m.items():
-                en = self.SPANISH_TO_EN.get(sk)
-                if en:
-                    metric_by_sid[sid] = en
+        add_family(CETES_SERIES)
+        add_family(BONOS_SERIES)
+        add_family(BONDES_D_SERIES)
+        add_family(BONDES_F_SERIES)
+        add_family(BONDES_G_SERIES)
 
         all_sids = list(metric_by_sid.keys())
         if not all_sids:
@@ -168,42 +180,30 @@ class BanxicoMXNOTR(DataNode):
         # --- 4) Prepare pivoted frames per (family, tenor), columns in EN
         frames: Dict[tuple, pd.DataFrame] = {}
 
-        # CETES pivots
-        for tenor, mapping in CETES_SERIES.items():
-            # include coupon if present
-            sids = {mapping.get(k) for k in ("plazo", "precio_limpio", "precio_sucio", "cupon_vigente") if
-                    mapping.get(k)}
-            sub = long_df[long_df["series_id"].isin(sids)]
-            if sub.empty:
-                continue
-            wide = (
-                sub.pivot_table(index="date", columns="metric", values="value", aggfunc="last")
-                .rename_axis(None, axis="columns")
-            )
-            # ensure all target cols exist (EN)
-            for col in self.TARGET_COLS:
-                if col not in wide.columns:
-                    wide[col] = pd.NA
-            wide.index = pd.to_datetime(wide.index, utc=True)
-            wide.index.name = "time_index"
-            frames[("Cetes", f"{tenor}_OTR")] = wide[list(self.TARGET_COLS)]
+        def pivot_family(family_name: str, series_map: Dict[str, Dict[str, str]]):
+            for tenor, mapping in series_map.items():
+                sids = set(mapping.values())
+                sub = long_df[long_df["series_id"].isin(sids)]
+                if sub.empty:
+                    continue
+                wide = (
+                    sub.pivot_table(index="date", columns="metric", values="value", aggfunc="last")
+                    .rename_axis(None, axis="columns")
+                )
+                for col in self.TARGET_COLS:
+                    if col not in wide.columns:
+                        wide[col] = pd.NA
+                wide.index = pd.to_datetime(wide.index, utc=True)
+                wide.index.name = "time_index"
+                frames[(family_name, f"{tenor}_OTR")] = wide[list(self.TARGET_COLS)]
+        # CETES / BONOS
+        pivot_family("Cetes", CETES_SERIES)
+        pivot_family("Bonos", BONOS_SERIES)
 
-        # BONOS pivots
-        for tenor, mapping in BONOS_SERIES.items():
-            sids = set(mapping.values())
-            sub = long_df[long_df["series_id"].isin(sids)]
-            if sub.empty:
-                continue
-            wide = (
-                sub.pivot_table(index="date", columns="metric", values="value", aggfunc="last")
-                .rename_axis(None, axis="columns")
-            )
-            for col in self.TARGET_COLS:
-                if col not in wide.columns:
-                    wide[col] = pd.NA
-            wide.index = pd.to_datetime(wide.index, utc=True)
-            wide.index.name = "time_index"
-            frames[("Bonos", f"{tenor}_OTR")] = wide[list(self.TARGET_COLS)]
+        # NEW: BONDES (182 / D / F / G)
+        pivot_family("Bondes_D", BONDES_D_SERIES)
+        pivot_family("Bondes_F", BONDES_F_SERIES)
+        pivot_family("Bondes_G", BONDES_G_SERIES)
 
         if not frames:
             return pd.DataFrame()
@@ -213,12 +213,29 @@ class BanxicoMXNOTR(DataNode):
         assets = us.asset_list or self.get_asset_list()
         for a in assets:
             tkr = (a.ticker or "")
+
             if tkr.startswith("MCET_"):
                 family, tenor = "Cetes", tkr.split("MCET_", 1)[1]
-                type="zero_coupon"
+                sec_type = "zero_coupon"
+
             elif tkr.startswith("MBONO_"):
                 family, tenor = "Bonos", tkr.split("MBONO_", 1)[1]
-                type = "fixed_bond"
+                sec_type = "fixed_bond"
+
+            #  Bondes families
+
+            elif tkr.startswith("BONDES_D_"):
+                family, tenor = "Bondes_D", tkr.split("BONDES_D_", 1)[1]
+                sec_type = "floating_bondes_d"
+
+            elif tkr.startswith("BONDES_F_"):
+                family, tenor = "Bondes_F", tkr.split("BONDES_F_", 1)[1]
+                sec_type = "floating_bondes_f"
+
+            elif tkr.startswith("BONDES_G_"):
+                family, tenor = "Bondes_G", tkr.split("BONDES_G_", 1)[1]
+                sec_type = "floating_bondes_g"
+
             else:
                 continue
 
@@ -229,7 +246,7 @@ class BanxicoMXNOTR(DataNode):
             df = frames[key].copy()
             uid = getattr(a, "unique_identifier", None) or tkr
             df["unique_identifier"] = uid
-            df["type"]=type
+            df["type"] = sec_type
             out_parts.append(df.set_index("unique_identifier", append=True))
 
         if not out_parts:
@@ -254,4 +271,7 @@ class BanxicoMXNOTR(DataNode):
         out_parts.append(long_df[out_parts[0].columns])
         out = pd.concat(out_parts).sort_index()
         out = out.replace(np.nan, None)
+
+        out=out[out.days_to_maturity>0] #some banxico series have errors
+
         return out

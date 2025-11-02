@@ -3,25 +3,9 @@ import mainsequence.client as msc
 from mainsequence.client import Constant as _C
 
 
-# -----------------------------
-# Gurantee constants on any workflows
-# -----------------------------
 
-constants_to_seed = dict(
-    REFERENCE_RATE__TIIE_28="TIIE_28",
-    REFERENCE_RATE__TIIE_91="TIIE_91",
-    REFERENCE_RATE__TIIE_182="TIIE_182",
-    REFERENCE_RATE__TIIE_OVERNIGHT="TIIE_OVERNIGHT",
 
-    REFERENCE_RATE__CETE_28="CETE_28",
-    REFERENCE_RATE__CETE_91="CETE_91",
-    REFERENCE_RATE__CETE_182="CETE_182",
 
-    #curves
-    ZERO_CURVE__BANXICO_M_BONOS_OTR = "BANXICO_M_BONOS_OTR",
-)
-
-_C.create_constants_if_not_exist(constants_to_seed)
 
 
 # -----------------------------
@@ -49,6 +33,46 @@ BONOS_SERIES: Dict[str, Dict[str, str]] = {
     "7-10y":  {"plazo": "SF45430", "precio_limpio": "SF45454", "precio_sucio": "SF45455", "cupon_vigente": "SF45478"},
     "10-20y": {"plazo": "SF45431", "precio_limpio": "SF45456", "precio_sucio": "SF45457", "cupon_vigente": "SF45479"},
     "20-30y": {"plazo": "SF60720", "precio_limpio": "SF60721", "precio_sucio": "SF60722", "cupon_vigente": "SF60723"},
+}
+
+BONDES_182_SERIES: Dict[str, Dict[str, str]] = {
+    "182d": {
+        "plazo": "SF45426",
+        "precio_limpio": "SF45446",
+        "precio_sucio": "SF45447",
+        "cupon_vigente": "SF45474",
+    }
+}
+
+BONDES_D_SERIES: Dict[str, Dict[str, str]] = {
+    "1y": {"plazo": "SF59767",  "precio_limpio": "SF59773",  "precio_sucio": "SF59774",  "cupon_vigente": "SF59770"},
+    "2y": {"plazo": "SF339752", "precio_limpio": "SF339753", "precio_sucio": "SF339754", "cupon_vigente": "SF339755"},
+    "3y": {"plazo": "SF59768",  "precio_limpio": "SF59775",  "precio_sucio": "SF59776",  "cupon_vigente": "SF59771"},
+    "5y": {"plazo": "SF59769",  "precio_limpio": "SF59777",  "precio_sucio": "SF59778",  "cupon_vigente": "SF59772"},
+}
+
+BONDES_F_SERIES: Dict[str, Dict[str, str]] = {
+    "1y": {"plazo": "SF343403", "precio_limpio": "SF343391", "precio_sucio": "SF343395", "cupon_vigente": "SF343399"},
+    "2y": {"plazo": "SF343404", "precio_limpio": "SF343392", "precio_sucio": "SF343396", "cupon_vigente": "SF343400"},
+    "3y": {"plazo": "SF343405", "precio_limpio": "SF343393", "precio_sucio": "SF343397", "cupon_vigente": "SF343401"},
+    "5y": {"plazo": "SF343406", "precio_limpio": "SF343394", "precio_sucio": "SF343398", "cupon_vigente": "SF343402"},
+    "7y": {"plazo": "SF345944", "precio_limpio": "SF345941", "precio_sucio": "SF345942", "cupon_vigente": "SF345943"},
+}
+
+BONDES_G_SERIES: Dict[str, Dict[str, str]] = {
+    "2y":  {"plazo": "SF347149", "precio_limpio": "SF347134", "precio_sucio": "SF347139", "cupon_vigente": "SF347144"},
+    "4y":  {"plazo": "SF347150", "precio_limpio": "SF347135", "precio_sucio": "SF347140", "cupon_vigente": "SF347145"},
+    "6y":  {"plazo": "SF347151", "precio_limpio": "SF347136", "precio_sucio": "SF347141", "cupon_vigente": "SF347146"},
+    "8y":  {"plazo": "SF347152", "precio_limpio": "SF347137", "precio_sucio": "SF347142", "cupon_vigente": "SF347147"},
+    "10y": {"plazo": "SF347153", "precio_limpio": "SF347138", "precio_sucio": "SF347143", "cupon_vigente": "SF347148"},
+}
+
+# (Optional) convenience registry if you like iterating by family name
+BONDES_FAMILIES: Dict[str, Dict[str, Dict[str, str]]] = {
+    "Bondes_182": BONDES_182_SERIES,
+    "Bondes_D": BONDES_D_SERIES,
+    "Bondes_F": BONDES_F_SERIES,
+    "Bondes_G": BONDES_G_SERIES,
 }
 
 FUNDING_RATES={"1d":"SF331451"}

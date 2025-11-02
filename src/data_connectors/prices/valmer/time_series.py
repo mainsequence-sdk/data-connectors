@@ -1,6 +1,6 @@
 import re
 from datetime import timedelta
-from typing import Union, Dict
+from typing import Union, Dict,List, Tuple
 import pandas as pd
 from tqdm import tqdm
 import mainsequence.client as msc
@@ -183,7 +183,6 @@ class ImportValmer(DataNode):
         )
         return explanation
 
-
     def _get_artifact_data(self):
         """
         Reads all artifacts from the bucket, normalizes columns, and concatenates them into a single DataFrame.
@@ -203,24 +202,11 @@ class ImportValmer(DataNode):
             if self.artifact_data is not None:
                 return self.artifact_data
 
-            artifacts = Artifact.filter(bucket__name=self.bucket_name)
-            sorted_artifacts = sorted(artifacts, key=lambda artifact: artifact.name)
-
-            self.logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{self.bucket_name}'.")
-
-            # --- Conditional processing based on process_all_files flag ---
-            artifact_dates = []
-            for artifact in sorted_artifacts:
-                match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
-                if match:
-                    artifact_dates.append(pd.to_datetime(match.group(1), utc=True))
-                else:
-                    continue
-
+            artifacts,artifact_dates=self._get_artifacts(self.logger, self.bucket_name)
             latest_date = self.local_persist_manager.get_update_statistics_for_table().get_max_time_in_update_statistics()
             if latest_date:
                 self.logger.info(f"Filtering artifacts newer than {latest_date}.")
-                sorted_artifacts = [a for a, a_date in zip(sorted_artifacts, artifact_dates) if a_date > latest_date]
+                sorted_artifacts = [a for a, a_date in zip(artifacts, artifact_dates) if a_date > latest_date]
 
             sorted_artifacts = sorted_artifacts[:5]
 
@@ -229,6 +215,139 @@ class ImportValmer(DataNode):
                 self.logger.info("No new artifacts to process. Task finished.")
                 return pd.DataFrame()
 
+        frames=self._concatenate_artifacts_content(sorted_artifacts,self.logger)
+
+        try:
+            self.artifact_data = pd.concat(frames, ignore_index=True, sort=False, copy=False)
+        except TypeError:
+            self.artifact_data = pd.concat(frames, ignore_index=True, sort=False)
+
+        self.logger.info(f"Combined all artifacts into a single DataFrame with {len(self.artifact_data)} rows.")
+        return self.artifact_data
+
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        return {}
+
+
+    #------- Helpers for bond and vector filter -------#
+    @staticmethod
+    def _get_target_bonds(df_latest:pd.DataFrame):
+        floating_tiie = df_latest[df_latest["subyacente"].astype(str).str.contains("TIIE", na=False)]
+        floating_cetes = df_latest[df_latest["subyacente"].astype(str).str.contains("CETE", na=False)]
+        cetes = df_latest[df_latest["subyacente"].astype(str).str.contains("Cete", na=False)]
+        m_bono_fixed_0 = df_latest[df_latest["subyacente"].astype(str).str.contains("Bonos M", na=False)]
+        m_bono_fixed_0 = m_bono_fixed_0[m_bono_fixed_0.monedaemision == "MPS"]
+
+        bondes_d=df_latest[df_latest["subyacente"].astype(str).str.contains("Fondeo Bancario", na=False)]
+        bondes_f_g=df_latest[df_latest["subyacente"].astype(str).str.contains("Tasa TIIE Fondeo 1D", na=False)]
+
+        all_target_bonds = pd.concat([floating_tiie, floating_cetes, m_bono_fixed_0, cetes,bondes_d,bondes_f_g], axis=0, ignore_index=True)
+
+        return all_target_bonds
+
+    @staticmethod
+    def _get_uids_to_update(
+            unique_identifiers: List[str],
+            existing_assets: Dict[str, "msc.Asset"],
+            all_target_bonds: pd.DataFrame,
+            *,
+            force_update: bool = False,
+    ) -> Tuple[List[str], List[str]]:
+        """
+        Decide which UIDs need (a) asset registration and/or (b) pricing-detail update.
+
+        Returns:
+            missing_assets: list[str]   -> assets not in existing_assets (register )
+            pricing_updates: list[str]  -> assets (existing or newly-created) that need pricing-detail update
+
+        Behavior:
+            - Pricing updates are only considered for *target bonds* (present in all_target_bonds).
+            - If force_update=True, every existing target bond goes to pricing_updates.
+        """
+        if all_target_bonds.empty:
+            return [], []
+
+        target_rows = (
+            all_target_bonds.drop_duplicates("unique_identifier", keep="last")
+            .set_index("unique_identifier")
+        )
+        target_uids = set(target_rows.index)
+
+        missing_assets: List[str] = []
+        pricing_updates: List[str] = []
+
+        # If you're only updating pricing, limit the iteration to target UIDs
+        candidates = unique_identifiers
+
+        for u in candidates:
+            in_targets = u in target_uids
+            asset = existing_assets.get(u)
+
+            if asset is None:
+                missing_assets.append(u)
+                # Newly-created assets also need pricing details *if* they are target bonds.
+                if in_targets:
+                    pricing_updates.append(u)
+
+                continue
+
+            # Existing asset
+            if not in_targets:
+                # Not a target bond => no pricing update requested.
+                continue
+
+            if force_update:
+                pricing_updates.append(u)
+                continue
+
+            cpd = getattr(asset, "current_pricing_detail", None)
+            if not cpd or getattr(cpd, "instrument_dump", None) is None:
+                pricing_updates.append(u)
+                continue
+
+            old_face_value = None
+            try:
+                old_face_value = cpd.instrument_dump.get("instrument", {}).get("face_value")
+            except Exception:
+                old_face_value = None
+
+            # Compare against latest nominal value in targets
+            new_face_value = target_rows.loc[u].get("valornominalactualizado", None)
+            if old_face_value is None or old_face_value != new_face_value:
+                pricing_updates.append(u)
+
+
+
+        # Deduplicate while preserving order
+        def _dedup(seq: List[str]) -> List[str]:
+            return list(dict.fromkeys(seq))
+
+        return _dedup(missing_assets), _dedup(pricing_updates)
+
+    @staticmethod
+    def _get_artifacts(logger,bucket_name):
+
+
+
+        artifacts = Artifact.filter(bucket__name=bucket_name)
+        sorted_artifacts = sorted(artifacts, key=lambda artifact: artifact.name)
+
+        logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{bucket_name}'.")
+
+        # --- Conditional processing based on process_all_files flag ---
+        artifact_dates = []
+        for artifact in sorted_artifacts:
+            match = re.search(r'(\d{4}-\d{2}-\d{2})', artifact.name)
+            if match:
+                artifact_dates.append(pd.to_datetime(match.group(1), utc=True))
+            else:
+                continue
+
+
+
+        return sorted_artifacts,artifact_dates
+    @staticmethod
+    def _concatenate_artifacts_content(sorted_artifacts,logger):
         frames = []
         for artifact in tqdm(sorted_artifacts):
             if isinstance(artifact, msc.Artifact):
@@ -246,13 +365,13 @@ class ImportValmer(DataNode):
                     except Exception:
                         df = pd.read_csv(buf, encoding="latin1", low_memory=False)
                 else:
-                    self.logger.info(f"Skipping unsupported file type: {artifact.name}")
+                    logger.info(f"Skipping unsupported file type: {artifact.name}")
                     continue
 
                 if df is None or df.empty:
                     continue
             else:
-                df=artifact
+                df = artifact
 
             # Normalize all column names
             df.columns = [normalize_column_name(col) for col in df.columns]
@@ -267,7 +386,7 @@ class ImportValmer(DataNode):
                     .str.cat(df["serie"].astype("string"), sep="_")
                 )
             else:
-                self.logger.warning(
+                logger.warning(
                     f"Skipping unique_identifier creation for {artifact.name} due to missing columns."
                 )
                 continue
@@ -275,18 +394,150 @@ class ImportValmer(DataNode):
             frames.append(df)
 
         if not frames:
-            raise ValueError(f"No valid data frames could be created from files in bucket '{self.bucket_name}'.")
+            raise ValueError(f"No valid data frames could be created from files in bucket .")
+        return frames
 
-        try:
-            self.artifact_data = pd.concat(frames, ignore_index=True, sort=False, copy=False)
-        except TypeError:
-            self.artifact_data = pd.concat(frames, ignore_index=True, sort=False)
+    @staticmethod
+    def _pick_latest_artifact(artifacts, logger):
+        """Pick the single latest artifact by YYYY-MM-DD in its name; fallback to last by name."""
+        import re
+        if not artifacts:
+            return None
 
-        self.logger.info(f"Combined all artifacts into a single DataFrame with {len(self.artifact_data)} rows.")
-        return self.artifact_data
+        def _parse_dt(a):
+            m = re.search(r"(\d{4}-\d{2}-\d{2})", a.name)
+            return pd.to_datetime(m.group(1), utc=True) if m else pd.NaT
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
-        return {}
+        dated = [(a, _parse_dt(a)) for a in artifacts]
+        dated = [(a, d) for a, d in dated if pd.notna(d)]
+        if dated:
+            max_date = max(d for _, d in dated)
+            candidates = [a for a, d in dated if d == max_date]
+            selected = sorted(candidates, key=lambda x: x.name)[-1]
+            logger.info(f"Selected latest artifact: {selected.name} ({max_date.date()})")
+            return selected
+
+        logger.warning("No parsable dates in artifact names; falling back to last by name.")
+        return sorted(artifacts, key=lambda a: a.name)[-1]
+
+    def _register_and_update_pricing(self,
+                                     unique_identifiers: List[str],
+                                     df_latest: pd.DataFrame,
+                                     all_target_bonds: pd.DataFrame,
+                                     *,
+                                     force_update: bool = False) -> list:
+        """One orchestrator for both paths (full vector or last vector)."""
+        import os
+
+        # pull existing assets once
+        per_page_assets = int(os.environ.get("VALMER_PER_PAGE", 5000))
+        existing_assets_list = msc.Asset.query(unique_identifier__in=unique_identifiers, per_page=per_page_assets)
+        existing_assets = {a.unique_identifier: a for a in existing_assets_list}
+
+        missing_assets, pricing_updates = self._get_uids_to_update(
+            unique_identifiers, existing_assets, all_target_bonds, force_update=force_update
+        )
+
+        df_latest_idx = (
+            df_latest.drop_duplicates("unique_identifier", keep="last")
+            .set_index("unique_identifier")
+        )
+        target_uids = set(all_target_bonds["unique_identifier"].unique())
+
+        # --- register missing assets ---
+        registered_assets = []
+        newly_registered_map: Dict[str, "msc.Asset"] = {}
+        if missing_assets:
+            for i in range(0, len(missing_assets), per_page_assets):
+                batch = missing_assets[i:i + per_page_assets]
+                assets_payload = [
+                    {"unique_identifier": uid, "snapshot": {"name": uid, "ticker": uid}}
+                    for uid in batch
+                ]
+                self.logger.info(
+                    f"Getting or registering assets in batch {i // per_page_assets + 1}/"
+                    f"{(len(missing_assets) + per_page_assets - 1) // per_page_assets}..."
+                )
+                try:
+                    assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
+                    registered_assets.extend(assets)
+                    newly_registered_map.update({a.unique_identifier: a for a in assets})
+                except Exception as e:
+                    self.logger.error(f"Failed to process asset batch: {e}")
+                    raise
+
+        # --- decide pricing recipients ---
+        uids_needing_pricing = set(pricing_updates)
+        uids_needing_pricing.update(u for u in missing_assets if u in target_uids)
+
+        if uids_needing_pricing:
+            instrument_pricing_detail_map: Dict[str, dict] = {}
+            for uid in uids_needing_pricing:
+                if uid not in df_latest_idx.index:
+                    continue
+                row = df_latest_idx.loc[uid]
+
+                icalendar, business_day_convention, settlement_days, day_count = get_instrument_conventions(row)
+                ql_bond = build_qll_bond_from_row(
+                    row=row,
+                    calendar=icalendar,
+                    dc=day_count,
+                    bdc=business_day_convention,
+                    settlement_days=settlement_days,
+                )
+                instrument_pricing_detail_map[uid] = {
+                    "instrument": ql_bond,
+                    "pricing_details_date": row["fecha"],
+                }
+
+            # target the correct asset objects (newly registered + existing)
+            assets_for_update: Dict[str, "msc.Asset"] = {}
+            assets_for_update.update(
+                {u: newly_registered_map[u] for u in newly_registered_map.keys() if u in instrument_pricing_detail_map}
+            )
+            assets_for_update.update(
+                {u: existing_assets[u] for u in pricing_updates if
+                 u in existing_assets and u in instrument_pricing_detail_map}
+            )
+
+            for uid, asset in assets_for_update.items():
+                try:
+                    asset.add_instrument_pricing_details_from_ms_instrument(**instrument_pricing_detail_map[uid])
+                except Exception as e:
+                    self.logger.error(f"Failed to update pricing details for {uid}: {e}")
+
+        return registered_assets + list(existing_assets.values())
+    def update_pricing_details_from_last_vector(self,force_update=False):
+        artifacts, artifact_dates = self._get_artifacts(self.logger, self.bucket_name)
+        if not artifacts:
+            self.logger.info("No artifacts to process.")
+            return []
+
+        last_artifact = self._pick_latest_artifact(artifacts, self.logger)
+        if last_artifact is None:
+            self.logger.info("No latest artifact could be selected.")
+            return []
+        source_df_list = self._concatenate_artifacts_content([last_artifact], self.logger)
+        if not source_df_list:
+            self.logger.info("Latest artifact produced no usable rows.")
+            return []
+        source_df = source_df_list[0]
+        df_latest, all_target_bonds, unique_identifiers = self._prepare_latest_inputs(source_df)
+        self.logger.info(f"[last vector] Found {len(unique_identifiers)} unique assets to process.")
+        return self._register_and_update_pricing(unique_identifiers, df_latest, all_target_bonds,
+                                                 force_update=force_update)
+
+    def _prepare_latest_inputs(self, df: pd.DataFrame):
+        """Common prep: normalize, latest rows per UID, target bonds, and universe of UIDs."""
+        df = df[df["unique_identifier"].notna()].copy()
+        df["fecha"] = pd.to_datetime(df["fecha"], format="%Y%m%d", utc=True)
+
+        idx = df.groupby("unique_identifier")["fecha"].idxmax()
+        df_latest = df.loc[idx].reset_index(drop=True)
+
+        all_target_bonds = self._get_target_bonds(df_latest)
+        unique_identifiers = df["unique_identifier"].unique().tolist()
+        return df_latest, all_target_bonds, unique_identifiers
 
     def get_asset_list(self) -> Union[None, list]:
         """
@@ -294,124 +545,9 @@ class ImportValmer(DataNode):
         """
         self.source_data = self._get_artifact_data()
         if self.source_data.empty: return []
-
-        self.source_data = self.source_data[self.source_data['unique_identifier'].notna()].copy()
-        self.source_data['fecha'] = pd.to_datetime(self.source_data['fecha'], format='%Y%m%d', utc=True)
-
-        idx =  self.source_data.groupby('unique_identifier')['fecha'].idxmax()
-        df_latest =  self.source_data.loc[idx].reset_index(drop=True)
-
-
-
-
-        floating_tiie =df_latest [df_latest["subyacente"].astype(str).str.contains("TIIE", na=False)]
-        floating_cetes =df_latest [df_latest ["subyacente"].astype(str).str.contains("CETE", na=False)]
-        m_bono_fixed_0=df_latest [df_latest ["subyacente"].astype(str).str.contains("Bonos M", na=False)]
-        m_bono_fixed_0 = m_bono_fixed_0[m_bono_fixed_0.monedaemision == "MPS"]
-
-
-        all_target_bonds = pd.concat([floating_tiie, floating_cetes,m_bono_fixed_0], axis=0, ignore_index=True)
-
-
-
-
-        unique_identifiers = self.source_data['unique_identifier'].unique().tolist()
+        df_latest, all_target_bonds, unique_identifiers = self._prepare_latest_inputs(self.source_data)
         self.logger.info(f"Found {len(unique_identifiers)} unique assets to process.")
-
-        registered_assets = []
-
-
-
-        #get all assets fast
-        per_page_assets=os.environ.get("VALMER_PER_PAGE",5000)
-        existing_assets=msc.Asset.query(unique_identifier__in=unique_identifiers,per_page=per_page_assets)
-        existing_assets={a.unique_identifier:a for a in existing_assets}
-        uids_to_update=[]
-        uids_to_update_pricing_details=[]
-        for u in unique_identifiers:
-
-
-            if u not in existing_assets.keys():
-                uids_to_update.append(u)
-                continue
-
-            target_asset = existing_assets[u]
-            target_row = all_target_bonds[all_target_bonds.unique_identifier == u]
-            if  target_row.empty ==True:
-                # Note only adding instrument details for floaters
-                continue
-            target_row=target_row.iloc[0]
-            if  target_asset.current_pricing_detail is None :
-                uids_to_update.append(u)
-                continue
-            if target_asset.current_pricing_detail.instrument_dump is None:
-                #wrongly assigned
-                uids_to_update.append(u)
-                continue
-
-            old_face_value=target_asset.current_pricing_detail.instrument_dump["instrument"].get("face_value")
-            if old_face_value is None:
-                # no pricing instruments
-                uids_to_update.append(u)
-                continue
-            #update in face value
-            if old_face_value!=target_row["valornominalactualizado"] :
-                uids_to_update.append(u)
-                continue
-
-
-
-        instrument_pricing_detail_map={}
-
-        for i in range(0, len(uids_to_update), per_page_assets):
-            batch_identifiers = uids_to_update[i:i + per_page_assets]
-            assets_payload = []
-
-            for identifier in batch_identifiers:
-                snapshot = {
-                    "name": identifier,
-                    "ticker": identifier
-                }
-                payload_item = {
-                    "unique_identifier": identifier,
-                    "snapshot": snapshot,
-                }
-                assets_payload.append(payload_item)
-                row=df_latest[df_latest['unique_identifier']==identifier].iloc[0]
-                if row["unique_identifier"] in all_target_bonds["unique_identifier"].to_list():
-                    if str(row["reglacupon"]) =="0":
-                        continue #Todo not implemented zero
-                    icalendar, business_day_convention, settlement_days, day_count = get_instrument_conventions(row)
-
-                    ql_bond=build_qll_bond_from_row(row=row,
-
-                                                       calendar=icalendar, dc=day_count,
-                                                       bdc=business_day_convention, settlement_days=settlement_days,
-                                                       )
-
-                    instrument_pricing_detail_map[identifier]={"instrument":ql_bond,
-                                                               "pricing_details_date":row["fecha"]
-                                                               }
-                else:
-                    continue
-            if not assets_payload:
-                continue
-
-            self.logger.info(f"Getting or registering assets in batch {i // per_page_assets + 1}/{len(uids_to_update)//per_page_assets}...")
-            try:
-                assets = msc.Asset.batch_get_or_register_custom_assets(assets_payload)
-                registered_assets.extend(assets)
-            except Exception as e:
-                self.logger.error(f"Failed to process asset batch: {e}")
-                raise
-
-        for asset in registered_assets:
-            if asset.unique_identifier in instrument_pricing_detail_map.keys():
-                asset.add_instrument_pricing_details_from_ms_instrument(**instrument_pricing_detail_map[asset.unique_identifier]
-                                                                        )
-
-        asset_list=registered_assets+list(existing_assets.values())
-        return asset_list
+        return self._register_and_update_pricing(unique_identifiers, df_latest, all_target_bonds, force_update=False)
 
     def _get_column_metadata(self):
         from mainsequence.client.models_tdag import ColumnMetaData

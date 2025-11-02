@@ -41,7 +41,7 @@ _BANXICO_CURVES = {
       _C.get_value(name="ZERO_CURVE__BANXICO_M_BONOS_OTR"): boostrap_mbono_curve,
 }
 _POLYGON_CURVES = {
-    _C.get_value(name="ZERO_CURVE__UST_CMT_ZERO_CURVE_UID"): bootstrap_cmt_curve,
+    _C.get_value(name="ZERO_CURVE__POLYGON_UST_CMT_ZERO_CURVE_UID"): bootstrap_cmt_curve,
 }
 
 # ---- Public, aggregated registry ----

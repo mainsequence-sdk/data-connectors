@@ -53,3 +53,4 @@ htmlcov/
 
 # Editors/OS
 .idea
+/src/algoseek/
