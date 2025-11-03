@@ -24,23 +24,29 @@ from pathlib import Path
 # =============================================================================
 # Configuration toggles for “coupon count” to match the sheet convention
 # =============================================================================
-COUNT_FROM_SETTLEMENT: bool = True     # vendor sheets often count from settlement (T+1/T+2)
+COUNT_FROM_SETTLEMENT: bool = True  # vendor sheets often count from settlement (T+1/T+2)
 INCLUDE_REF_DATE_EVENTS: bool = False  # treat flows ON ref date as already occurred (QL default)
 
 SUBYACENTE_TO_INDEX_MAP = {"TIIE28": _C.get_value(name="REFERENCE_RATE__TIIE_28"),
-                           "TIIE182":  _C.get_value(name="REFERENCE_RATE__TIIE_182"),
-                           "TIIE91":  _C.get_value(name="REFERENCE_RATE__TIIE_91"),
-                           "TIIE28 EQUIV 182":  _C.get_value(name="REFERENCE_RATE__TIIE_182"),
-                           "Tasa TIIE Fondeo 1D":  _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"),
-                           "CETE_28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
-                           "CETE28":  _C.get_value(name="REFERENCE_RATE__CETE_28"),
-                           "CETE182":  _C.get_value(name="REFERENCE_RATE__CETE_182"),
+                           "TIIE182": _C.get_value(name="REFERENCE_RATE__TIIE_182"),
+                           "TIIE91": _C.get_value(name="REFERENCE_RATE__TIIE_91"),
+                           "TIIE28 EQUIV 182": _C.get_value(name="REFERENCE_RATE__TIIE_182"),
+                           "Tasa TIIE Fondeo 1D": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"),
+                           "CETE_28": _C.get_value(name="REFERENCE_RATE__CETE_28"),
+                           "CETE28": _C.get_value(name="REFERENCE_RATE__CETE_28"),
+                           "CETE182": _C.get_value(name="REFERENCE_RATE__CETE_182"),
                            "Bonos M Bruta(Yield)": _C.get_value(name="REFERENCE_RATE__CETE_28"),
                            "Fondeo Bancario": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"),
                            "Tasa TIIE Fondeo 1D": _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"),
-                           "IRMXP-FGub-28":_C.get_value(name="REFERENCE_RATE__CETE_28"),
-                           "IRMXP-FGub-91":_C.get_value(name="REFERENCE_RATE__CETE_91")
+                           "IRMXP-FGub-28": _C.get_value(name="REFERENCE_RATE__CETE_28"),
+                           "IRMXP-FGub-91": _C.get_value(name="REFERENCE_RATE__CETE_91"),
+                           "AAA": _C.get_value(name="REFERENCE_RATE__TIIE_28"),
+                           "D1": _C.get_value(name="REFERENCE_RATE__TIIE_28"),
+                           "P8-X8": _C.get_value(name="REFERENCE_RATE__CETE_182"),
+                           "P12-X12": _C.get_value(name="REFERENCE_RATE__CETE_182"),
+                           "P4-X4": _C.get_value(name="REFERENCE_RATE__CETE_91"),
                            }
+
 
 # =============================================================================
 # Small dataclass for the built instrument
@@ -50,7 +56,7 @@ class BuiltBond:
     row_ix: int
     emisora: str
     serie: str
-    bond: msi.FloatingRateBond          # your model
+    bond: msi.FloatingRateBond  # your model
     eval_date: dt.date
 
 
@@ -60,8 +66,10 @@ class BuiltBond:
 def qld(d: dt.date) -> ql.Date:
     return ql.Date(d.day, d.month, d.year)
 
+
 def pyd(d: ql.Date) -> dt.date:
     return dt.date(d.year(), int(d.month()), d.dayOfMonth())
+
 
 def parse_val_date(v) -> dt.date:
     """Handle integer 20240903, '2024-09-03', pandas Timestamp, etc."""
@@ -75,28 +83,32 @@ def parse_val_date(v) -> dt.date:
     except Exception:
         return pd.to_datetime(v).date()
 
+
 def parse_iso_date(v) -> dt.date:
     if pd.isna(v):
         raise ValueError("Missing date")
     return pd.to_datetime(v).date()
 
-def parse_coupon_period(freq_val, default_days: int = 28) -> ql.Period:
+
+def parse_coupon_period(freq_val, ) -> ql.Period:
     """
     Parse strings like: '28Dias', '30 dias', '91DÍAS', '184Dias'. Fallback to default.
     """
     if pd.isna(freq_val):
-        return ql.Period(default_days, ql.Days)
+        raise Exception("Invalid freq_val")
     s = str(freq_val).strip().lower()
     m = re.search(r"(\d+)", s)
-    days = int(m.group(1)) if m else default_days
-    days = days if days > 0 else default_days
+    days = int(m.group(1))
+    days = days
     return ql.Period(days, ql.Days)
+
 
 def parse_coupon_days(freq_val, ) -> int:
     """Integer version (days)."""
 
     m = re.search(r"(\d+)", str(freq_val).lower())
     return int(m.group(1))
+
 
 def sch_len(s: ql.Schedule) -> int:
     try:
@@ -114,17 +126,20 @@ def sch_len(s: ql.Schedule) -> int:
                     break
             return i
 
+
 def sch_date(s: ql.Schedule, i: int) -> ql.Date:
     try:
         return s.date(i)
     except Exception:
         return list(s.dates())[i]
 
+
 def sch_dates(s: ql.Schedule) -> List[ql.Date]:
     try:
         return list(s.dates())
     except Exception:
         return [sch_date(s, j) for j in range(sch_len(s))]
+
 
 @contextmanager
 def ql_include_ref_events(include: bool):
@@ -142,17 +157,17 @@ def ql_include_ref_events(include: bool):
 # Build a schedule that *forces* the sheet's coupon count to match
 # =============================================================================
 def compute_sheet_schedule_force_match(
-    row: pd.Series,
-    *,
-    calendar: ql.Calendar = ql.Mexico(),
-    bdc: int = ql.Following,
-    default_freq_days: int = 28,
-    adjust_maturity_date: bool = False,
-    # vendor sometimes uses these alt columns
-    settlement_days: int = 2,
-    count_from_settlement: bool = True,
-    include_boundary_for_count: bool = True,  # vendor counts the on‑settlement payment
-    dc: ql.DayCounter = ql.Actual360(),       # to force DIAS TRANSC. CPN
+        row: pd.Series,
+        *,
+        calendar: ql.Calendar = ql.Mexico(),
+        bdc: int = ql.Following,
+        freq_days: ql.Period,
+        adjust_maturity_date: bool = False,
+        # vendor sometimes uses these alt columns
+        settlement_days: int = 2,
+        count_from_settlement: bool = True,
+        include_boundary_for_count: bool = True,  # vendor counts the on‑settlement payment
+        dc: ql.DayCounter = ql.Actual360(),  # to force DIAS TRANSC. CPN
 ) -> ql.Schedule:
     """
     Build an explicit schedule that:
@@ -168,7 +183,6 @@ def compute_sheet_schedule_force_match(
     a payment on settlement is counted as "to collect".
     """
 
-
     # ---- helpers -------------------------------------------------------------
     def _adjust(d: dt.date, convention: int = bdc) -> dt.date:
         return pyd(calendar.adjust(qld(d), convention))
@@ -177,11 +191,10 @@ def compute_sheet_schedule_force_match(
         return a < b
 
     # ---- inputs --------------------------------------------------------------
-    eval_date    = parse_val_date(row["fecha"])
+    eval_date = parse_val_date(row["fecha"])
     maturity_raw = parse_iso_date(row["fechavcto"])
     maturity_pay = _adjust(maturity_raw) if adjust_maturity_date else maturity_raw
     # frequency in days (28, 30, 91, ...)
-    freq_days = parse_coupon_days(row["freccpn"])
 
     # counting boundary (vendor: settlement, including on-ref)
     if count_from_settlement:
@@ -198,13 +211,8 @@ def compute_sheet_schedule_force_match(
 
     cmp_keep = (lambda d: d >= boundary_eff) if include_boundary_for_count else (lambda d: d > boundary_eff)
 
-
-
-
-
-
     coupons_left = int(row["cuponesxcobrar"]) if "cuponesxcobrar" in row and pd.notna(row["cuponesxcobrar"]) else None
-    dias_trans   = int(row["diastransccpn"]) if pd.notna(row.get("diastransccpn")) else None
+    dias_trans = int(row["diastransccpn"]) if pd.notna(row.get("diastransccpn")) else None
 
     # Case A: sheet says no coupons left => return redemption-only schedule
     if coupons_left is not None and coupons_left <= 0:
@@ -216,8 +224,9 @@ def compute_sheet_schedule_force_match(
     # Collect all payment dates >= boundary by walking backwards with 'freq_days'.
     nat_desc: List[dt.date] = [maturity_pay]
     d = maturity_pay
+    assert freq_days.units() == ql.Days,"Period should be in days"
     while True:
-        prev_unadj = d - dt.timedelta(days=freq_days)
+        prev_unadj = d - dt.timedelta(days=freq_days.length())
         prev_adj = _adjust(prev_unadj)
         # if adjustment doesn't move it strictly back, nudge with Preceding and day-by-day
         if not _strictly_before(prev_adj, d):
@@ -314,9 +323,6 @@ def compute_sheet_schedule_force_match(
     return ql.Schedule(dv, calendar, bdc)
 
 
-
-
-
 def _count_future_coupons(b: ql.Bond, ref_py: dt.date, include_ref: bool) -> int:
     n = 0
     with ql_include_ref_events(include_ref):
@@ -324,9 +330,10 @@ def _count_future_coupons(b: ql.Bond, ref_py: dt.date, include_ref: bool) -> int
         for cf in b.cashflows():
             if ql.as_floating_rate_coupon(cf) is None:
                 continue
-            if not cf.hasOccurred(ref):    # 1-arg overload only
+            if not cf.hasOccurred(ref):  # 1-arg overload only
                 n += 1
     return n
+
 
 def _flow_table(b: ql.Bond, *, eval_date: dt.date, settle_date: dt.date) -> pd.DataFrame:
     rows: List[Dict[str, Any]] = []
@@ -403,18 +410,18 @@ def _snap_first_future(schedule: ql.Schedule,
 
 
 def assert_schedule_matches_sheet_debug(
-    row: pd.Series,
-    schedule: ql.Schedule,
-    *,
-    calendar: ql.Calendar = ql.Mexico(),
-    bdc: int = ql.Following,
-    day_count: ql.DayCounter = ql.Actual360(),
-    settlement_days: int = 1,
-    count_from_settlement: bool = True,
-    include_ref_date_events: bool = False,
-    auto_fix: bool = False,
-    allow_equal_on_first: bool = False,
-    probe_bond: Optional[ql.Bond] = None,
+        row: pd.Series,
+        schedule: ql.Schedule,
+        *,
+        calendar: ql.Calendar = ql.Mexico(),
+        bdc: int = ql.Following,
+        day_count: ql.DayCounter = ql.Actual360(),
+        settlement_days: int = 1,
+        count_from_settlement: bool = True,
+        include_ref_date_events: bool = False,
+        auto_fix: bool = False,
+        allow_equal_on_first: bool = False,
+        probe_bond: Optional[ql.Bond] = None,
 ) -> ql.Schedule:
     """
     Verifies that future coupon count matches the sheet AND prints a forensic
@@ -468,7 +475,7 @@ def assert_schedule_matches_sheet_debug(
     # 6) If mismatch, print a precise “why”
     if expected is not None and chosen_cnt != expected:
         print("──────────── Coupon Count Assertion (DIAGNOSTIC) ────────────")
-        print(f"EMISORA={row.get('EMISORA','')}  SERIE={row.get('SERIE','')}")
+        print(f"EMISORA={row.get('EMISORA', '')}  SERIE={row.get('SERIE', '')}")
         print(f"FECHA={eval_date}   Settlement(T+{settlement_days})={settle_date}")
         print(f"Schedule dates ({len(sched_py)}): {sched_py}")
         print(f"Maturity (sheet)={maturity}  Schedule.last={last_date}\n")
@@ -482,12 +489,12 @@ def assert_schedule_matches_sheet_debug(
         print(f"Sheet 'CUPONES X COBRAR' : {expected}\n")
         if first_future:
             ref_label = "SETTLE" if count_from_settlement else "FECHA"
-            ref_val   = settle_date if count_from_settlement else eval_date
+            ref_val = settle_date if count_from_settlement else eval_date
             cmp = "≤" if (first_future <= ref_val) else ">"
             print(f"First future date = {first_future}  |  {ref_label} = {ref_val}  "
                   f"→  first_future {cmp} {ref_label}")
             if (include_ref_date_events is False and first_future <= ref_val) or \
-               (include_ref_date_events is True  and first_future <  ref_val):
+                    (include_ref_date_events is True and first_future < ref_val):
                 print("⚠ This boundary is the reason you are off by exactly 1.")
                 print("   Under your counting rule, that payment is considered 'past'.")
         if last_date != maturity:
@@ -533,16 +540,15 @@ def assert_schedule_matches_sheet_debug(
     return schedule
 
 
-
 # =============================================================================
 # Coupon counters for built instruments
 # =============================================================================
 
 def count_future_coupons(
-    b: ql.Bond,
-    *,
-    from_settlement: bool = COUNT_FROM_SETTLEMENT,
-    include_ref_date_events: bool = INCLUDE_REF_DATE_EVENTS
+        b: ql.Bond,
+        *,
+        from_settlement: bool = COUNT_FROM_SETTLEMENT,
+        include_ref_date_events: bool = INCLUDE_REF_DATE_EVENTS
 ) -> int:
     """
     Count future coupons the way QL does it:
@@ -569,62 +575,87 @@ def count_future_coupons(
 # Build a QL floater from a sheet row + curve
 # =============================================================================
 def build_qll_bond_from_row(
-    row: pd.Series,
-    *,
-    calendar: ql.Calendar,
-    dc: ql.DayCounter,
-    bdc: int,
-    settlement_days: int,
-    SPREAD_IS_PERCENT: bool = True,
+        row: pd.Series,
+        *,
+        calendar: ql.Calendar,
+        dc: ql.DayCounter,
+        bdc: int,
+        settlement_days: int,
+        SPREAD_IS_PERCENT: bool = True,
 ) -> BuiltBond:
     """
     Create your FloatingRateBond model with an explicit schedule that matches the sheet.
     """
     # --- read inputs (Spanish columns) ---
-    eval_date     = parse_val_date(row["fecha"])
-    issue_date    = parse_iso_date(row["fechaemision"])
+    eval_date = parse_val_date(row["fecha"])
+    issue_date = parse_iso_date(row["fechaemision"])
     maturity_date = parse_iso_date(row["fechavcto"])
-    face_adj      = float(row["valornominalactualizado"])
-    raw_spread    = 0.0 if pd.isna(row["sobretasa"]) else float(row["sobretasa"])
+    face_adj = float(row["valornominalactualizado"])
+    raw_spread = 0.0 if pd.isna(row["sobretasa"]) else float(row["sobretasa"])
     spread_decimal = (raw_spread / 100.0) if SPREAD_IS_PERCENT else raw_spread
 
-    coupon_rule=row["reglacupon"]
-    emisora=row["emisora"]
-    tipo_valor=row["tipovalor"]
+    coupon_rule = row["reglacupon"]
+    emisora = row["emisora"]
+    tipo_valor = row["tipovalor"]
+    cuponesemision = row["cuponesemision"]
+
     # --- global QL settings ---
     ql.Settings.instance().evaluationDate = qld(eval_date)
     ql.Settings.instance().includeReferenceDateEvents = INCLUDE_REF_DATE_EVENTS
     ql.Settings.instance().enforceTodaysHistoricFixings = False
 
+    zero_corps_tipo_valor = ["I", "93", "92"]
 
-
+    is_zero_coupon = tipo_valor in zero_corps_tipo_valor or emisora in ["CETES"]
+    is_zero_coupon = is_zero_coupon if cuponesemision == 0 else False
     # --- schedule that forces remaining coupons to match the sheet ---
-    if coupon_rule !=0 and tipo_valor not in ["I","93"]:
+    if not is_zero_coupon:
+        try:
+            if f"{tipo_valor}_{emisora}" in ["MC_BONOS","MP_BONOS"]:
+                coupon_frequency = parse_coupon_period(182)
+                is_zero_coupon=True
+            elif tipo_valor in ["JI"]:
+                #Bonos internacionales o multilaterales en pesos, tasa fija
+                coupon_frequency = parse_coupon_period(182)
+            elif tipo_valor in ["D2","D8"]:
+                coupon_frequency = parse_coupon_period(182)
+            else:
+                coupon_frequency = parse_coupon_period(row.get("freccpn"))
+        except Exception as e:
+            raise e
         explicit_schedule = compute_sheet_schedule_force_match(
             row,
             calendar=calendar,
             bdc=bdc,
-            default_freq_days=parse_coupon_period(row.get("freccpn")),
+            freq_days=coupon_frequency,
             settlement_days=settlement_days,  # ← add this
             count_from_settlement=COUNT_FROM_SETTLEMENT,  # ← and this (keeps your toggle)
             include_boundary_for_count=True,  # ← ven
         )
-    if coupon_rule ==0 or tipo_valor  in ["I","93"]:
+    if is_zero_coupon:
+        assert cuponesemision == 0, "No Zero coupon bond review log"
         if "BONDES" in emisora:
             benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP["CETE_28"]
-        elif  tipo_valor  in ["I","93"]:
-            benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP["TIIE28"]
+        elif tipo_valor in ["MC","MP"]:
+            benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP["CETE182"]
+        elif tipo_valor in zero_corps_tipo_valor:
+            try:
+                benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["subyacente"]]
+            except Exception as e:
+                raise e
+        elif emisora in ["CETES"]:
+            benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP["CETE_28"]
         else:
             raise NotImplementedError
         frb = msi.ZeroCouponBond(face_value=face_adj,
-                                benchmark_rate_index_name=benchmark_rate_index_name,
-                                issue_date=issue_date,
-                                maturity_date=maturity_date,
-                                day_count=dc,
-                                calendar=calendar,
-                                business_day_convention=bdc,
-                                settlement_days=settlement_days,
-                                )
+                                 benchmark_rate_index_name=benchmark_rate_index_name,
+                                 issue_date=issue_date,
+                                 maturity_date=maturity_date,
+                                 day_count=dc,
+                                 calendar=calendar,
+                                 business_day_convention=bdc,
+                                 settlement_days=settlement_days,
+                                 )
     elif coupon_rule == "Tasa Fija":  # Fixed Rate Bond
 
         benchmark_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["subyacente"]]
@@ -635,7 +666,7 @@ def build_qll_bond_from_row(
 
                                 issue_date=issue_date,
                                 maturity_date=maturity_date,
-                                coupon_frequency=parse_coupon_period(row.get("freccpn")),
+                                coupon_frequency=coupon_frequency,
                                 day_count=dc,
                                 calendar=calendar,
                                 business_day_convention=bdc,
@@ -645,7 +676,7 @@ def build_qll_bond_from_row(
 
     else:  # floating rate bond
         try:
-            floating_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["reglacupon"]]
+            floating_rate_index_name = SUBYACENTE_TO_INDEX_MAP[row["subyacente"]]
         except KeyError as e:
             raise e
 
@@ -656,7 +687,7 @@ def build_qll_bond_from_row(
             spread=spread_decimal,
             issue_date=issue_date,
             maturity_date=maturity_date,
-            coupon_frequency=parse_coupon_period(row.get("freccpn")),
+            coupon_frequency=coupon_frequency,
             day_count=dc,
             calendar=calendar,
             business_day_convention=bdc,
@@ -664,7 +695,7 @@ def build_qll_bond_from_row(
             benchmark_rate_index_name=floating_rate_index_name,
             schedule=explicit_schedule,
         )
-    frb.set_valuation_date( eval_date,)
+    frb.set_valuation_date(eval_date, )
 
     # --- assert/diagnose + (optionally) auto-fix the front boundary ---
     # with_yield = float(row["TASA DE RENDIMIENTO"]) / 100
@@ -702,17 +733,17 @@ def build_qll_bond_from_row(
     #         valuation_date=eval_date,
     #         schedule=fixed_schedule,  # <— IMPORTANT
     #     )
-    return  frb
+    return frb
 
 
 # =============================================================================
 # Cashflow extraction (future only)
-# =============================================================================
+# =============================================================================f
 def extract_future_cashflows(
-    built: BuiltBond,
-    *,
-    from_settlement: bool = COUNT_FROM_SETTLEMENT,
-    include_ref_date_events: bool = INCLUDE_REF_DATE_EVENTS
+        built: BuiltBond,
+        *,
+        from_settlement: bool = COUNT_FROM_SETTLEMENT,
+        include_ref_date_events: bool = INCLUDE_REF_DATE_EVENTS
 ) -> Dict[str, List[Dict[str, Any]]]:
     ql_bond = built.bond.bond
     ql.Settings.instance().evaluationDate = qld(built.eval_date)
@@ -769,26 +800,28 @@ def get_instrument_conventions(
     """
     currency = row["monedaemision"]
     subyacente = row["subyacente"]
-    emisora= row["emisora"]
-    tipo_valor=row["tipovalor"]
+    emisora = row["emisora"]
+    tipo_valor = row["tipovalor"]
+    zero_typo_valor_cors = ["I", "93", "92"]
     if currency == "MPS":  # Mexican Peso
         calendar = ql.Mexico(ql.Mexico.BMV)
 
-        is_bondes= emisora in ["BONDESD","BONDESF","BONDESG"]
+        is_bondes = emisora in ["BONDESD", "BONDESF", "BONDESG"]
         # Check for standard Mexican money market and short-term instruments
         try:
-            if  tipo_valor in ["I","93"]:
+            if tipo_valor in zero_typo_valor_cors:
                 calendar = ql.Mexico(ql.Mexico.BMV)
                 day_count = ql.Actual360()
                 business_day_convention = ql.Following
                 settlement_days = 1
-            elif any(keyword in subyacente for keyword in ["Bonos M", "CETE","Cetes","IRMXP-FGub-28","IRMXP-FGub-91"]) or is_bondes:
+            elif any(keyword in subyacente for keyword in
+                     ["Bonos M", "CETE", "Cetes", "IRMXP-FGub-28", "IRMXP-FGub-91"]) or is_bondes:
                 business_day_convention = ql.Following
                 settlement_days = 1  # T+1 is standard for these
                 day_count = ql.Actual360()
 
 
-            elif any(keyword in subyacente for keyword in ["TIIE"]) :
+            elif any(keyword in subyacente for keyword in ["TIIE"]):
                 calendar = ql.Mexico(ql.Mexico.BMV)
                 day_count = ql.Actual360()
                 business_day_convention = ql.Following
@@ -806,23 +839,22 @@ def get_instrument_conventions(
 
 
 def run_price_check(
-    bonos_df: pd.DataFrame,
-    *,
-    SPREAD_IS_PERCENT: bool = True,
-    price_tol_bp: float = 2.0,
+        bonos_df: pd.DataFrame,
+        *,
+        SPREAD_IS_PERCENT: bool = True,
+        price_tol_bp: float = 2.0,
 ) -> Tuple[pd.DataFrame, Dict[str, msi.Instrument]]:
     results: List[Dict[str, Any]] = []
     instrument_map: Dict[str, msi.Instrument] = {}
 
     for ix, row in tqdm(bonos_df.iterrows(), desc="building instruments"):
         eval_date = parse_val_date(row["fecha"])
-        eval_date=dt.datetime(eval_date.year,eval_date.month,eval_date.day,tzinfo=pytz.utc)
-
+        eval_date = dt.datetime(eval_date.year, eval_date.month, eval_date.day, tzinfo=pytz.utc)
 
         if row["cuponactual"] == 0.0 or row["cuponesxcobrar"] == 0:
             continue
 
-        icalendar, business_day_convention, settlement_days, day_count=get_instrument_conventions(row)
+        icalendar, business_day_convention, settlement_days, day_count = get_instrument_conventions(row)
 
         # Build bond (explicit schedule)
         try:
@@ -843,10 +875,10 @@ def run_price_check(
 
         ql_bond = bond.get_ql_bond()  # underlying QL object
 
-        face    = float(row["valornominalactualizado"])
+        face = float(row["valornominalactualizado"])
         model_dirty = float(analytics["dirty_price"]) * face / 100.0
         model_clean = float(analytics["clean_price"]) * face / 100.0
-        model_accr  = model_dirty - model_clean
+        model_accr = model_dirty - model_clean
         model_accr_per100 = 100.0 * (model_accr / face)
 
         # Market sheet dirty/clean (per 100)
@@ -857,14 +889,14 @@ def run_price_check(
 
         # Running coupon (find the period containing eval_date or settlement)
         running_coupon_model = np.nan
-        dias_transcurridos   = np.nan
+        dias_transcurridos = np.nan
         if ql_bond.cashflows():
             ref_for_days = ql_bond.settlementDate() if COUNT_FROM_SETTLEMENT else qld(eval_date)
             for cf in ql_bond.cashflows():
-                if isinstance(ql_bond,ql.FloatingRateBond):
+                if isinstance(ql_bond, ql.FloatingRateBond):
                     cpn = ql.as_floating_rate_coupon(cf)
                 else:
-                    cpn=ql.as_fixed_rate_coupon(cf)
+                    cpn = ql.as_fixed_rate_coupon(cf)
                 if cpn is None:
                     continue
                 if cpn.accrualStartDate() <= ref_for_days < cpn.accrualEndDate():
@@ -884,22 +916,23 @@ def run_price_check(
 
         # df=bond.get_cashflows_df()
         # Diffs
-        price_diff_bp  = 100.0 * (model_dirty - mkt_dirty) / mkt_dirty
+        price_diff_bp = 100.0 * (model_dirty - mkt_dirty) / mkt_dirty
         coupon_diff_bp = ((running_coupon_model - float(row["cuponactual"])) * 100.0
                           if not np.isnan(running_coupon_model) else np.nan)
-        pass_price     = abs(price_diff_bp) <= price_tol_bp
+        pass_price = abs(price_diff_bp) <= price_tol_bp
         pass_cpn_count = (np.isnan(expected_count) or (future_cpn_count == expected_count))
 
-        instrument_hash= bond.content_hash()
+        instrument_hash = bond.content_hash()
         results.append({
             "instrument_hash": instrument_hash,
 
             "FECHA": eval_date,
-            "UID":f"{row['tipovalor']}_{row['emisora']}_{row['serie']}",
-            "SUBYACENTE":row["subyacente"],
+            "UID": f"{row['tipovalor']}_{row['emisora']}_{row['serie']}",
+            "SUBYACENTE": row["subyacente"],
             "VALOR NOMINAL": float(row["valornominal"]),
             "SOBRETASA_in": float(row["sobretasa"]),
-            "SOBRETASA_decimal": (float(row["sobretasa"]) / 100.0) if SPREAD_IS_PERCENT and not pd.isna(row["sobretasa"]) else float(row["sobretasa"] or 0.0),
+            "SOBRETASA_decimal": (float(row["sobretasa"]) / 100.0) if SPREAD_IS_PERCENT and not pd.isna(
+                row["sobretasa"]) else float(row["sobretasa"] or 0.0),
             "CUPON ACTUAL (sheet) %": float(row["cuponactual"]),
             "CUPON ACTUAL (model) %": running_coupon_model,
             "coupon_diff_bp": coupon_diff_bp,
@@ -917,9 +950,11 @@ def run_price_check(
             "DIAS TRANSC. CPN (model)": dias_transcurridos,
         })
 
-        instrument_map[instrument_hash] = {"instrument":bond,"extra_market_info":{"yield":row["tasaderendimiento"]/100}}
+        instrument_map[instrument_hash] = {"instrument": bond,
+                                           "extra_market_info": {"yield": row["tasaderendimiento"] / 100}}
 
     return pd.DataFrame(results), instrument_map
+
 
 def normalize_column_name(col_name: str) -> str:
     """
@@ -930,14 +965,11 @@ def normalize_column_name(col_name: str) -> str:
     return re.sub(r'[^a-z0-9]', '', cleaned_name.lower())
 
 
-
-
-
 def build_position_from_sheet(
-    sheet_path: str | Path,
-    *,
-    notional_per_line: float = 100_000_000.0,
-    out_path: str | Path | None = None
+        sheet_path: str | Path,
+        *,
+        notional_per_line: float = 100_000_000.0,
+        out_path: str | Path | None = None
 ) -> Tuple[Position, Dict[str, Any], str]:
     """
     Build instruments from a vendor sheet and dump a 'position.json'-style file.
@@ -949,21 +981,19 @@ def build_position_from_sheet(
     df = pd.read_excel(sheet_path)
     df.columns = [normalize_column_name(col) for col in df.columns]
 
-    floating_tiie  = df[df["subyacente"].astype(str).str.contains("TIIE", na=False)]
+    floating_tiie = df[df["subyacente"].astype(str).str.contains("TIIE", na=False)]
     floating_cetes = df[df["subyacente"].astype(str).str.contains("CETE", na=False)]
     m_bono_fixed_0 = df[df["subyacente"].astype(str).str.contains("Bonos M", na=False)]
-    m_bono_fixed_0=m_bono_fixed_0[m_bono_fixed_0.monedaemision=="MPS"]
-    all_floating   = pd.concat([floating_tiie, floating_cetes,m_bono_fixed_0], axis=0, ignore_index=True)
-
+    m_bono_fixed_0 = m_bono_fixed_0[m_bono_fixed_0.monedaemision == "MPS"]
+    all_floating = pd.concat([floating_tiie, floating_cetes, m_bono_fixed_0], axis=0, ignore_index=True)
 
     df_out, instrument_map = run_price_check(all_floating)
     pd.set_option("display.float_format", lambda x: f"{x:,.6f}")
 
-    ms_assets_map=msc.Asset.filter(unique_identifier__in=df_out["UID"].to_list())
-    ms_assets_map={k.unique_identifier:k.id for k in ms_assets_map}
+    ms_assets_map = msc.Asset.filter(unique_identifier__in=df_out["UID"].to_list())
+    ms_assets_map = {k.unique_identifier: k.id for k in ms_assets_map}
 
-    df_out["asset_id"]=df_out["UID"].map(ms_assets_map)
-
+    df_out["asset_id"] = df_out["UID"].map(ms_assets_map)
 
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.csv', delete=True) as temp_csv:
         temp_file_path = temp_csv.name
@@ -974,11 +1004,3 @@ def build_position_from_sheet(
                                                            created_by_resource_name=__file__,
                                                            filepath=temp_file_path,
                                                            )
-
-
-
-
-
-
-
-

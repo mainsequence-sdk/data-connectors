@@ -698,7 +698,7 @@ if __name__ == "__main__":
     # node.run(force_update=True)
 
     node=AlgoSeekDailyOHLCFIGI(daily_dir=DAILY_DIR,security_master_path=SECMASTER_CSV,is_demo=True)
-    # node.get_last_observation()
+    node.get_last_observation()
     # node.run(update_tree=False,force_update=True)
 
     node=AlgoSeek1MinTradesAdjusted(trades_dir=TRADES_DIR,security_master_path=SECMASTER_CSV,is_demo=True)

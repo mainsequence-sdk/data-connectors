@@ -243,7 +243,7 @@ class ImportValmer(DataNode):
         bondes_d=df_latest[df_latest["subyacente"].astype(str).str.contains("Fondeo Bancario", na=False)]
         bondes_f_g=df_latest[df_latest["subyacente"].astype(str).str.contains("Tasa TIIE Fondeo 1D", na=False)]
 
-        zero_corps=df_latest[df_latest["tipovalor"].astype(str).isin(["I","93"])]
+        zero_corps=df_latest[df_latest["tipovalor"].astype(str).isin(["I","93","92"])]
         zero_corps=zero_corps[zero_corps["monedaemision"].isin(["MPS"])]
 
         bpas=df_latest[df_latest.emisora.isin(["BPAG91","BPAG28","BPA182"])]
@@ -252,7 +252,7 @@ class ImportValmer(DataNode):
         all_target_bonds = pd.concat([floating_tiie, floating_cetes, m_bono_fixed_0, cetes,bondes_d,bondes_f_g,
         zero_corps,bpas], axis=0, ignore_index=True)
 
-
+        # all_target_bonds = pd.concat([zero_corps], axis=0, ignore_index=True)
         all_target_bonds=all_target_bonds[~all_target_bonds.fechaemision.isnull()]
 
         return all_target_bonds
