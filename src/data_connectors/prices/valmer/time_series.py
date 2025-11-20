@@ -341,7 +341,7 @@ class ImportValmer(DataNode):
 
 
 
-        artifacts = Artifact.filter(bucket__name=bucket_name)
+        artifacts = Artifact.filter(bucket__name=bucket_name,)
         sorted_artifacts = sorted(artifacts, key=lambda artifact: artifact.name)
 
         logger.info(f"Found {len(sorted_artifacts)} artifacts in bucket '{bucket_name}'.")

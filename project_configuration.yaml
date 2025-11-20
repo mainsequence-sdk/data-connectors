@@ -3,7 +3,7 @@ jobs:
   - name: "Binance Prices Daily"
     resource:
       notebook:
-        path: "data_connectors/notebooks/binance_daily.ipynb"
+        path: "src/data_connectors/notebooks/binance_daily.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -11,7 +11,7 @@ jobs:
   - name: "Alpaca Prices Daily Test"
     resource:
       notebook:
-        path: "data_connectors/notebooks/alpaca_daily_test.ipynb"
+        path: "src/data_connectors/notebooks/alpaca_daily_test.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -19,7 +19,7 @@ jobs:
   - name: "Alpaca Prices Daily"
     resource:
       notebook:
-        path: "data_connectors/notebooks/alpaca_daily.ipynb"
+        path: "src/data_connectors/notebooks/alpaca_daily.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -27,7 +27,7 @@ jobs:
   - name: "Fundamentals"
     resource:
       notebook:
-        path: "data_connectors/notebooks/fundamentals.ipynb"
+        path: "src/data_connectors/notebooks/fundamentals.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -35,7 +35,7 @@ jobs:
   - name: "Coingecko Market Cap"
     resource:
       notebook:
-        path: "data_connectors/notebooks/coingecko_market_cap.ipynb"
+        path: "src/data_connectors/notebooks/coingecko_market_cap.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -43,7 +43,7 @@ jobs:
   - name: "Polygon Market Cap"
     resource:
       notebook:
-        path: "data_connectors/notebooks/polygon_market_cap.ipynb"
+        path: "src/data_connectors/notebooks/polygon_market_cap.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -57,7 +57,7 @@ jobs:
   - name: "Banxico MBONOS"
     resource:
       notebook:
-        path: "data_connectors/notebooks/banxico_mbonos.ipynb"
+        path: "src/data_connectors/notebooks/banxico_mbonos.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -65,7 +65,7 @@ jobs:
   - name: "Banxico TIEE Fixing"
     resource:
       notebook:
-        path: "data_connectors/notebooks/banxico_tiie_fixing.ipynb"
+        path: "src/data_connectors/notebooks/banxico_tiie_fixing.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -73,7 +73,7 @@ jobs:
   - name: "Discount Curves"
     resource:
       notebook:
-        path: "data_connectors/notebooks/discount_curves.ipynb"
+        path: "src/data_connectors/notebooks/discount_curves.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
@@ -81,7 +81,7 @@ jobs:
   - name: "Valmer Vector Update"
     resource:
       notebook:
-        path: "data_connectors/notebooks/valmer_prices.ipynb"
+        path: "src/data_connectors/notebooks/valmer_prices.ipynb"
     schedule:
       type: "crontab"
       expression: "0 0 * * *"
