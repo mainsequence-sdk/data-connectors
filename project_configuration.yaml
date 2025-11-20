@@ -8,7 +8,7 @@ jobs:
       type: "crontab"
       expression: "0 0 * * *"
 
-  - name: "Alpaca Prices Daily Test"
+  - name: "Alpacaa Prices Daily Test"
     resource:
       notebook:
         path: "notebooks/alpaca_daily_test.ipynb"
